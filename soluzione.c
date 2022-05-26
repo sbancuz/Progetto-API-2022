@@ -58,8 +58,8 @@ size_t countScorr(char * str, char * str2, size_t len, char needle)
 
 int main()
 {
-    char * r = "abcabcabcabcabc";
-    char * p = "bbaabccbccbcabc";
+    char * r = "djPDi939-s__e-s";
+    char * p = "gioSON-we2_w234";
     size_t len = strlen(r);
     char * res = malloc(len * sizeof(char));
 
@@ -69,13 +69,15 @@ int main()
         {
             res[i] = '+';
         }
-        else if (!contains(p, len, r[i]))
+        else if (!contains(r, len, p[i]))
             res[i] = '/';
         else
         {
             size_t n = count(r, len, p[i]);
             size_t c = countCorr(r, p, len, p[i]);
-            if (countScorr(p, r, i, p[i]) >= (n - c))
+            size_t s = countScorr(p, r, i, p[i]);
+        //    printf("%c - %ld - %ld - %ld\n", p[i], n, c, s);
+            if (s >= (n - c))
                 res[i] = '/';
             else
                 res[i] = '|';
