@@ -109,12 +109,12 @@ bool compatible(char *filter, char *r, char *p) {
     size_t n = count(r, p[i]);
     size_t c = countCorr(r, p, p[i]);
     size_t s = countScorr(p, r, i, p[i]);
-//     printf(" %c - n = %ld, c = %ld, s = %ld\n", p[i], n, c, s);
+    //     printf(" %c - n = %ld, c = %ld, s = %ld\n", p[i], n, c, s);
 
     if (filter[i] == '|' && (r[i] == p[i] || n == 0 || s >= n - c))
       return false;
 
-    if (filter[i] == '/' && (s < n - c || ( n != 0 && s == 0)))
+    if (filter[i] == '/' && (s < n - c || (n != 0 && s == 0)))
       return false;
   }
 
@@ -124,9 +124,9 @@ bool compatible(char *filter, char *r, char *p) {
 size_t removeIncompatible(char *filter, input *in, char *str) {
   size_t cont = 0;
   size_t pin = 0;
-//   printf("----------------\n");
-//   printf("|     %s     |\n", str);
-//   printf("----------------\n");
+  //   printf("----------------\n");
+  //   printf("|     %s     |\n", str);
+  //   printf("----------------\n");
 
   LOOP_OVER_INPUT(
       pin = in->start;
@@ -134,9 +134,9 @@ size_t removeIncompatible(char *filter, input *in, char *str) {
       if (compatible(filter, *pr, str)) {
         cont++;
         pin = j + 1;
-//         printf(">> %s\n", *pr);
+        //         printf(">> %s\n", *pr);
       } else {
-//         printf("XX %s\n", *pr);
+        //         printf("XX %s\n", *pr);
 
         // se deve saltare su un indice che ha un salto a sua volta,
         // allora aggiungo i salti del secondo nel primo, ricordati di
@@ -196,62 +196,99 @@ void insert(input *in, char *str) {
 }
 
 int main(int argc, char *argv[]) {
-  // getting rid of the first argument witch is the file name
-  NEXT_ARG();
-  assert(argc != 0 && "Please put some arguments to run this program!\n");
 
-  size_t wordsLen = (size_t)strtol(*argv, NULL, 10);
-  NEXT_ARG();
+  bool doCount = true;
+  size_t a;
+  char *arg;
 
-  // init input
+  getline(&arg, &a, stdin);
+  size_t wordsLen = strtol(arg, NULL, 10);
   input *in = malloc(sizeof(input));
-  in->arr = malloc(sizeof(char **));
-  in->arr = argv;
-  while (true) {
-    if (strcmp("+nuova_partita", *argv) == 0) {
-      NEXT_ARG();
-      break;
-    }
+  in->len = 0;
 
-    in->len++;
-    NEXT_ARG();
+  getline(&arg, &a, stdin);
+  while (!feof(stdin)) {
+    if (strcmp(arg, "+nuova_partita") == 0) {
+      doCount = false;
+      continue;
+    } else if (strcmp(arg, "+inserisci_inizio") == 0) {
+      doCount = true;
+      continue;
+    } else if (strcmp(arg, "+inserisci_fine") == 0) {
+      doCount = false;
+      continue;
+    }
+    if (doCount)
+      in->len++;
+
+    getline(&arg, &a, stdin);
+  }
+  printf("%s\n", arg);
+  freopen("a", "r", stdin);
+
+  getline(&arg, &a, stdin);
+  printf("%s\n", arg);
+
+  in->arr = malloc(sizeof(char *) * in->len);
+
+  char **ptr = in->arr;
+  int64_t len = 0;
+  while (strcmp(arg, "+nuova_partita") != 0) {
+    getline(&arg, &a, stdin);
+    *ptr = arg;
+    ptr++;
+    len++;
   }
 
-  char *referenceWord = *argv;
-  NEXT_ARG();
+  char *referenceWord;
+  getline(&referenceWord, NULL, stdin);
 
-  size_t guessesNumber = (size_t)strtol(*argv, NULL, 10);
-  NEXT_ARG();
+  getline(&arg, &a, stdin);
+  size_t guessesNumber = (size_t)strtol(arg, NULL, 10);
 
   bool hasWon = false;
   char *res = malloc(sizeof(char) * wordsLen);
 
   in->jumps = malloc(sizeof(int64_t) * in->len);
 
-  // TODO Don't use bubble-sort
+  for (size_t i = 0; i < in->len; i++)
+    *ptr = "~";
+  in->len = len;
+
+  // TODO find something better than insertion sort
   char *tmp;
-  for (size_t i = 0; i < in->len - 1; i++)
-    for (size_t j = 0; j < in->len - 1; j++)
-      if (strcmp(in->arr[j], in->arr[j + 1]) > 0) {
-        SWAP(tmp, in->arr[j], in->arr[j + 1]);
-      }
+  for (size_t i = 1; i < in->len; i++) {
+    int64_t j = i - 1;
+    tmp = in->arr[i];
+
+    while (j >= 0 && strcmp(tmp, in->arr[j]) < 0) {
+      in->arr[j + 1] = in->arr[j];
+      j--;
+    }
+
+    in->arr[j + 1] = tmp;
+  }
+
   szArr *storedRes = malloc(sizeof(szArr));
+  szArr *storedGuesses = malloc(sizeof(szArr));
 
   storedRes->v = malloc(sizeof(char *) * guessesNumber);
-  for (size_t i = 0; i < guessesNumber; i++)
-    storedRes->v[i] = malloc(sizeof(char) * wordsLen);
-
-  szArr *storedGuesses = malloc(sizeof(szArr));
   storedGuesses->v = malloc(sizeof(char *) * guessesNumber);
-  while (argc > 0) {
+  for (size_t i = 0; i < guessesNumber; i++) {
+    storedRes->v[i] = malloc(sizeof(char) * wordsLen);
+    storedGuesses->v[i] = malloc(sizeof(char) * wordsLen);
+  }
+
+  while (!feof(stdin)) {
     for (size_t i = 0; guessesNumber > 0; ++i) {
-      if (strcmp("+stampa_filtrate", *argv) == 0) {
+      if (strcmp("+stampa_filtrate", arg) == 0) {
         LOOP_OVER_INPUT(;, printf("%s\n", *pr);, ;)
-        NEXT_ARG();
+        getline(&arg, &a, stdin);
+
         continue;
 
-      } else if (strcmp("+inserisci_inizio", *argv) == 0) {
-        NEXT_ARG();
+      } else if (strcmp("+inserisci_inizio", arg) == 0) {
+        getline(&arg, &a, stdin);
 
         for (size_t j = 0; j < in->len; j++)
           if (in->jumps[j] == -1) {
@@ -259,59 +296,55 @@ int main(int argc, char *argv[]) {
             break;
           }
 
-        size_t oldLen = in->len;
-        while (strcmp("+inserisci_fine", *argv) != 0) {
-          NEXT_ARG();
-          in->arr[in->len] = "~"; // this is the ASCII max char
+        while (strcmp("+inserisci_fine", arg) != 0) {
+          getline(&arg, &a, stdin);
           in->len++;
+          insert(in, arg);
         }
-        in->jumps = realloc(in->jumps, sizeof(int64_t) * in->len);
-        for (size_t j = oldLen; j < in->len; j++)
-          in->jumps[j] = 0;
-        char **tmp2 = argv;
-        for (size_t j = in->len - oldLen; j > 0; j--)
-          insert(in, *--tmp2);
 
-        // TODO guardare solo questo slice
         for (size_t j = 0; j < storedRes->len; j++) {
           removeIncompatible(storedRes->v[j], in, storedGuesses->v[j]);
         }
 
-        NEXT_ARG();
+        getline(&arg, &a, stdin);
         continue;
 
-      } else if (strcmp(referenceWord, *argv) == 0) {
+      } else if (strcmp(referenceWord, arg) == 0) {
         printf("ok\n");
         hasWon = true;
-        NEXT_ARG();
+        if (argc > 0)
+          getline(&arg, &a, stdin);
         break;
-      } else if (!inInput(*argv, in)) {
-        printf("not_exists - %s\n", *argv);
-        NEXT_ARG();
+      } else if (!inInput(arg, in)) {
+        printf("not_exists\n");
+        getline(&arg, &a, stdin);
         continue;
       }
 
-      computeRes(referenceWord, *argv, res);
+      computeRes(referenceWord, arg, res);
       storedRes->len++;
       strcpy(storedRes->v[storedRes->len - 1], res);
       storedGuesses->len++;
-      storedGuesses->v[storedGuesses->len - 1] = *argv;
+      strcpy(storedGuesses->v[storedGuesses->len - 1], arg);
 
-      size_t remaining = removeIncompatible(res, in, *argv);
+      size_t remaining = removeIncompatible(res, in, arg);
       printf("%s\n%ld\n", res, remaining);
       guessesNumber--;
-      NEXT_ARG();
+      getline(&arg, &a, stdin);
     }
 
     if (!hasWon)
       printf("ko\n");
 
+    if (argc == 0)
+      break;
+
     if (strcmp("+inserisci_inizio", *argv) == 0) {
-      NEXT_ARG();
+      getline(&arg, &a, stdin);
 
       size_t oldLen = in->len;
       while (strcmp("+inserisci_fine", *argv) != 0) {
-        NEXT_ARG();
+        getline(&arg, &a, stdin);
         in->arr[in->len] = "~"; // this is the ASCII max char
         in->len++;
       }
@@ -322,7 +355,7 @@ int main(int argc, char *argv[]) {
       for (size_t j = in->len - oldLen; j > 0; j--)
         insert(in, *--tmp2);
 
-      NEXT_ARG();
+      getline(&arg, &a, stdin);
     }
     if (strcmp("+nuova_partita", *argv) == 0) {
       storedRes->len = 0;
@@ -330,12 +363,12 @@ int main(int argc, char *argv[]) {
       for (size_t i = 0; i < in->len; i++)
         in->jumps[i] = 0;
       in->start = 0;
-      NEXT_ARG();
+      getline(&arg, &a, stdin);
       referenceWord = *argv;
-      NEXT_ARG();
+      getline(&arg, &a, stdin);
       guessesNumber = strtol(*argv, NULL, 10);
     }
-    NEXT_ARG();
+    getline(&arg, &a, stdin);
   }
   // TODO Free everything
   free(res);
@@ -344,8 +377,10 @@ int main(int argc, char *argv[]) {
   //   free(in->arr);
   free(in->jumps);
   free(in);
-  for (size_t i = 0; i < storedRes->len; i++)
+  for (size_t i = 0; i < storedRes->len; i++) {
     free(storedRes->v[i]);
+    free(storedGuesses->v[i]);
+  }
   free(storedRes->v);
   free(storedGuesses->v);
   free(storedRes);

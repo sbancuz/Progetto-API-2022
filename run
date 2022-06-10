@@ -1,5 +1,5 @@
  #!/bin/sh
 
-CFLAGS="-Wall -Wextra -Wshadow -Werror -std=c11 -pedantic -ggdb"
+CFLAGS="-Wall -Wextra -Wshadow -Werror -std=gnu11 -pedantic -ggdb -O2"
 clear
-gcc $CFLAGS -o $1 $1.c && time ./$1 $(< ./open_testcases/$2.txt) >out.txt && diff ./open_testcases/$2.output.txt out.txt
+gcc $CFLAGS -o $1 $1.c && time ./$1 <<< $(< ./open_testcases/$2.txt) #>out.txt && diff ./open_testcases/$2.output.txt out.txt
