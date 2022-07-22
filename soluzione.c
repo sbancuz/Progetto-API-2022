@@ -7,17 +7,23 @@
 #include <string.h>
 
 #define ALPHALEN 64
+
 #define INIT_LINE_BUFFER()                                                     \
   size_t len = 0;                                                              \
   ssize_t numCharsRead = 0
+
 #define NEW_LINE(a)                                                            \
   numCharsRead = getline(&a, &len, stdin);                                     \
   a[numCharsRead - 1] = '\0'
 
+#define SET_BIT(m, i) m = ((uint64_t)1 << i) | m
+#define GET_BIT(m, i) (m >> i) & 1
 typedef struct node_s {
   struct node_s **next;
   struct node_s *prev;
+  uint64_t mask;
   uint32_t connected;
+  uint8_t lenght;
   char val;
 } node;
 
@@ -28,7 +34,7 @@ typedef struct sizedArr_s {
 
 size_t wordsLen;
 
-size_t getIndex(char c) {
+size_t mapCharToIndex(char c) {
   if (c >= '0' && c <= '9')
     return c - '0' + 1;
   if (c >= 'a' && c <= 'z')
@@ -42,11 +48,24 @@ size_t getIndex(char c) {
 
   return ALPHALEN + 1;
 }
+
+size_t getIndex(char c, uint64_t mask) {
+  size_t target = mapCharToIndex(c);
+  assert(target < 65);
+  size_t cont = 0;
+  for (size_t i = 0; i < target; i++) {
+    cont += (mask >> i) & 1;
+  }
+  return cont;
+}
+
 void *initNode(node *prev, char c) {
   node *n = malloc(sizeof(node));
   n->val = c;
+  n->mask = 0;
   n->connected = 0;
-  n->next = malloc(sizeof(node) * ALPHALEN);
+  n->lenght = 0;
+  n->next = malloc(sizeof(node));
   n->prev = prev;
   return (void *)n;
 }
@@ -54,14 +73,34 @@ void *initNode(node *prev, char c) {
 void addWord(node *nod, char *str) {
   if (*str == '\n' || *str == '\0')
     return;
+#ifdef DEBUG
+  printf("%c - %zu - %ld - %d\n", *str, nod->mask, getIndex(*str, nod->mask),
+         nod->lenght);
+#endif
+  if (nod->lenght == 0 || ((GET_BIT(nod->mask, mapCharToIndex(*str))) == 0) ||
+      (nod->next[getIndex(*str, nod->mask)]->val != *str)) {
+#ifdef DEBUG
+    printf("+++%c\n", *str);
+#endif
+    nod->next = realloc(nod->next, sizeof(node) * (nod->lenght + 1));
+    size_t newInd = getIndex(*str, nod->mask);
 
-  if (nod->next[getIndex(*str)] == NULL) {
-    nod->next[getIndex(*str)] = initNode(nod, *str);
+    if (newInd < nod->lenght)
+      for (size_t i = nod->lenght; i > newInd; i--)
+        nod->next[i] = nod->next[i - 1];
+
+    nod->next[newInd] = initNode(nod, *str);
+    nod->lenght++;
   }
+  SET_BIT(nod->mask, mapCharToIndex(*str));
+
   nod->connected++;
   char c = *str;
   str++;
-  addWord(nod->next[getIndex(c)], str);
+  addWord(nod->next[getIndex(c, nod->mask)], str);
+#ifdef DEBUG
+  printf("ret <-- %c\n", c);
+#endif
 }
 
 void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
@@ -76,13 +115,8 @@ void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
     printf("%s\n", tmpStr);
     return;
   }
-
-  for (size_t i = 0; i < ALPHALEN; i++) {
-    if (nod->next[i] != NULL) {
-      //    prob a bug with freeing mem
-      if (nod->next[i]->val != '\0')
-        dumpTreeImpl(nod->next[i], d + 1, tmpStr);
-    }
+  for (size_t i = 0; i < nod->lenght; i++) {
+    dumpTreeImpl(nod->next[i], d + 1, tmpStr);
   }
 }
 
@@ -95,10 +129,10 @@ void dumpTree(node *nod) {
 bool inTree(node *nod, char *needle) {
   node *tmp = nod;
   for (size_t i = 0; i < wordsLen; i++) {
-    if (tmp->next[getIndex(*needle)] == NULL) {
+    if (tmp->next[getIndex(*needle, tmp->mask)] == NULL) {
       return false;
     }
-    tmp = tmp->next[getIndex(*needle)];
+    tmp = tmp->next[getIndex(*needle, tmp->mask)];
     needle++;
   }
   return true;
@@ -206,20 +240,15 @@ size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
     return -2;
   }
 
-  for (size_t i = 0; i < ALPHALEN; i++) {
-    if (nod->next[i] != NULL) {
-      //    prob a bug with freeing mem
-      if (nod->next[i]->val != '\0') {
-        size_t ret =
-            removeIncompatibleImpl(filter, nod->next[i], d + 1, str, tmpStr);
-        if (ret == (size_t)-1) {
-          nod->next[i]->connected--;
-          if (nod->val != '#')
-            return (size_t)-1;
-          nod->connected--;
-          i--;
-        }
-      }
+  for (size_t i = 0; i < nod->lenght; i++) {
+    size_t ret =
+        removeIncompatibleImpl(filter, nod->next[i], d + 1, str, tmpStr);
+    if (ret == (size_t)-1) {
+      nod->next[i]->connected--;
+      if (nod->val != '#')
+        return (size_t)-1;
+      nod->connected--;
+      i--;
     }
   }
   return nod->connected;
@@ -234,13 +263,8 @@ size_t removeIncompatible(char *filter, node *nod, char *str) {
 
 uint32_t resetCounters(node *nod) {
   nod->connected = 0;
-  for (size_t i = 0; i < ALPHALEN; i++) {
-    if (nod->next[i] != NULL) {
-      //    prob a bug with freeing mem
-      if (nod->next[i]->val != '\0') {
-        nod->connected += resetCounters(nod->next[i]);
-      }
-    }
+  for (size_t i = 0; i < nod->lenght; i++) {
+    nod->connected += resetCounters(nod->next[i]);
   }
   if (nod->connected == 0)
     return 1;
@@ -248,13 +272,8 @@ uint32_t resetCounters(node *nod) {
 }
 
 void freeTree(node *nod) {
-  for (size_t i = 0; i < ALPHALEN; i++) {
-    if (nod->next[i] != NULL) {
-      //    prob a bug with freeing mem
-      if (nod->next[i]->val != '\0') {
-        freeTree(nod->next[i]);
-      }
-    }
+  for (size_t i = 0; i < nod->lenght; i++) {
+    freeTree(nod->next[i]);
   }
   free(nod->next);
   free(nod);
@@ -263,21 +282,30 @@ void freeTree(node *nod) {
 int main() {
   char *line;
   INIT_LINE_BUFFER();
-  fscanf(stdin, "%zu\n", &wordsLen);
-  //   wordsLen = strtol(line, NULL, 10);
+  NEW_LINE(line);
+
+  //   (void) fscanf(stdin, "%zu\n", &wordsLen);
+  wordsLen = strtol(line, NULL, 10);
   node *words = initNode(NULL, '#');
 
   line = malloc(sizeof(char) * wordsLen);
   NEW_LINE(line);
+#ifdef DEBUG
+  printf("---Input check------------\n");
+#endif
   while (!feof(stdin)) {
     if (strcmp(line, "+nuova_partita") == 0) {
       break;
     }
-
+#ifdef DEBUG
+    printf("----%s---------------\n", line);
+#endif
     addWord(words, line);
     NEW_LINE(line);
   }
-
+#ifdef DEBUG
+  printf("--------------------------\n");
+#endif
 #ifdef DEBUG
   printf("---Initial words----------\n");
   dumpTree(words);
@@ -357,7 +385,14 @@ int main() {
         guessesNumber = 0;
         break;
       } else if (!inTree(words, line)) {
+#ifdef DEBUG
+        printf("---------------------------\n");
+        printf("%s\n", line);
+#endif
         printf("not_exists\n");
+#ifdef DEBUG
+        printf("---------------------------\n");
+#endif
         NEW_LINE(line);
         continue;
       }
