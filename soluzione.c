@@ -232,17 +232,19 @@ size_t removeIncompatible(char *filter, node *nod, char *str) {
   return ret;
 }
 
-void resetCounters(node *nod) {
+uint32_t resetCounters(node *nod) {
   nod->connected = 0;
   for (size_t i = 0; i < ALPHALEN; i++) {
     if (nod->next[i] != NULL) {
       //    prob a bug with freeing mem
       if (nod->next[i]->val != '\0') {
-        nod->connected += 1;
-        resetCounters(nod->next[i]);
+        nod->connected += resetCounters(nod->next[i]);
       }
     }
   }
+  if (nod->connected == 0)
+    return 1;
+  return nod->connected;
 }
 
 void freeTree(node *nod) {
@@ -404,6 +406,7 @@ int main() {
       resetCounters(words);
 #ifdef DEBUG
       printf("---Initial words----------\n");
+      printf("%d\n", words->connected);
       dumpTree(words);
       printf("--------------------------\n");
 #endif

@@ -8,4 +8,4 @@ else
   OPT="-D DEBUG";
 fi
 set -xe
-gcc $OPT $CFLAGS -o $1 $1.c && time ./$1 <<< $(< ./open_testcases/$2.txt)  >out.txt && diff ./open_testcases/$2.output.txt out.txt
+gcc $OPT $CFLAGS -o $1 $1.c && time ./$1 <<< $(< ./open_testcases/$2.txt) > out.txt && diff ./open_testcases/$2.output.txt out.txt
