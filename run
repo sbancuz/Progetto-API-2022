@@ -7,4 +7,5 @@ if [ -z $3 ]; then
 else
   OPT="-D DEBUG";
 fi
-gcc $OPT $CFLAGS -o $1 $1.c && time ./$1 <<< $(< ./open_testcases/$2.txt) #>out.txt && diff ./open_testcases/$2.output.txt out.txt
+set -xe
+gcc $OPT $CFLAGS -o $1 $1.c && time ./$1 <<< $(< ./open_testcases/$2.txt)  >out.txt && diff ./open_testcases/$2.output.txt out.txt

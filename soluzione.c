@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ALPHALEN 63
+#define ALPHALEN 64
 #define INIT_LINE_BUFFER()                                                     \
   size_t len = 0;                                                              \
   ssize_t numCharsRead = 0
@@ -212,13 +212,12 @@ size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
       if (nod->next[i]->val != '\0') {
         size_t ret =
             removeIncompatibleImpl(filter, nod->next[i], d + 1, str, tmpStr);
-        //             printf("---- %ld %c\n", ret, nod->val);
         if (ret == (size_t)-1) {
           nod->next[i]->connected--;
-          if (nod->val != '#') {
+          if (nod->val != '#')
             return (size_t)-1;
-          }
           nod->connected--;
+          i--;
         }
       }
     }
@@ -276,6 +275,7 @@ int main() {
     addWord(words, line);
     NEW_LINE(line);
   }
+
 #ifdef DEBUG
   printf("---Initial words----------\n");
   dumpTree(words);
