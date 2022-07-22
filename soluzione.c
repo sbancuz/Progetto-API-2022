@@ -29,7 +29,7 @@ typedef struct node_s {
 
 typedef struct sizedArr_s {
   char **v;
-  size_t len;
+  uint32_t len;
 } szArr;
 
 size_t wordsLen;
@@ -129,7 +129,7 @@ void dumpTree(node *nod) {
 bool inTree(node *nod, char *needle) {
   node *tmp = nod;
   for (size_t i = 0; i < wordsLen; i++) {
-    if (tmp->next[getIndex(*needle, tmp->mask)] == NULL) {
+    if ((GET_BIT(tmp->mask, mapCharToIndex(*needle))) == 0) {
       return false;
     }
     tmp = tmp->next[getIndex(*needle, tmp->mask)];
@@ -346,6 +346,7 @@ int main() {
       printf("%s\n", line);
       printf("--------------------------\n");
 #endif
+
       if (strcmp("+stampa_filtrate", line) == 0) {
         dumpTree(words);
         NEW_LINE(line);
@@ -458,6 +459,14 @@ int main() {
       printf("%ld\n", guessesNumber);
       printf("--------------------------\n");
 #endif
+      if (storedRes->len < guessesNumber) {
+        storedRes->v = realloc(storedRes->v, sizeof(char *) * guessesNumber);
+        storedGuesses->v = realloc(storedGuesses->v, sizeof(char *) * guessesNumber);
+        for (size_t i = storedRes->len; i < guessesNumber; i++) {
+          storedRes->v[i] = malloc(sizeof(char) * wordsLen);
+          storedGuesses->v[i] = malloc(sizeof(char) * wordsLen);
+        }
+      }
       storedRes->len = 0;
       storedGuesses->len = 0;
     }
