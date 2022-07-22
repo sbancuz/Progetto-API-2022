@@ -1,42 +1,108 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define NEXT_ARG()                                                             \
-  assert(argc > 0 && "Args finiti\n");                                         \
-  argc--;                                                                      \
-  argv++
+#define ALPHALEN 63
+#define INIT_LINE_BUFFER()                                                     \
+  size_t len = 0;                                                              \
+  ssize_t numCharsRead = 0
+#define NEW_LINE(a)                                                            \
+  numCharsRead = getline(&a, &len, stdin);                                     \
+  a[numCharsRead - 1] = '\0'
 
-#define LOOP_OVER_INPUT(pre_s, expr, post_s)                                   \
-  pre_s char **pr = in->arr + in->start;                                       \
-  for (size_t j = in->start; j < in->len && in->jumps[j] != -1; pr++, j++) {   \
-                                                                               \
-    expr if (j != in->len - 1 && in->jumps[j + 1] != -1) {                     \
-      pr += in->jumps[j + 1];                                                  \
-      j += in->jumps[j + 1];                                                   \
-    }                                                                          \
-  }                                                                            \
-  post_s
-
-#define SWAP(tmp, a, b)                                                        \
-  tmp = a;                                                                     \
-  a = b;                                                                       \
-  b = tmp
-
-typedef struct input_s {
-  char **arr;
-  size_t len;
-  int64_t *jumps;
-  size_t start;
-} input;
+typedef struct node_s {
+  struct node_s **next;
+  struct node_s *prev;
+  uint32_t connected;
+  char val;
+} node;
 
 typedef struct sizedArr_s {
   char **v;
   size_t len;
 } szArr;
+
+size_t wordsLen;
+
+size_t getIndex(char c) {
+  if (c >= '0' && c <= '9')
+    return c - '0' + 1;
+  if (c >= 'a' && c <= 'z')
+    return c - 'a' + 38;
+  if (c >= 'A' && c <= 'Z')
+    return c - 'A' + 11;
+  if (c == '-')
+    return 0;
+  if (c == '_')
+    return 37;
+
+  return ALPHALEN + 1;
+}
+void *initNode(node *prev, char c) {
+  node *n = malloc(sizeof(node));
+  n->val = c;
+  n->connected = 0;
+  n->next = malloc(sizeof(node) * ALPHALEN);
+  n->prev = prev;
+  return (void *)n;
+}
+
+void addWord(node *nod, char *str) {
+  if (*str == '\n' || *str == '\0')
+    return;
+
+  if (nod->next[getIndex(*str)] == NULL) {
+    nod->next[getIndex(*str)] = initNode(nod, *str);
+  }
+  nod->connected++;
+  char c = *str;
+  str++;
+  addWord(nod->next[getIndex(c)], str);
+}
+
+void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
+  if (nod->connected == 0 && d == wordsLen - 1) {
+    node *tmp = nod;
+    while (tmp->val != '#') {
+      tmpStr[d] = tmp->val;
+      d--;
+      tmp = tmp->prev;
+    }
+
+    printf("%s\n", tmpStr);
+    return;
+  }
+
+  for (size_t i = 0; i < ALPHALEN; i++) {
+    if (nod->next[i] != NULL) {
+      //    prob a bug with freeing mem
+      if (nod->next[i]->val != '\0')
+        dumpTreeImpl(nod->next[i], d + 1, tmpStr);
+    }
+  }
+}
+
+void dumpTree(node *nod) {
+  char *tmpStr = malloc(sizeof(char) * wordsLen);
+  dumpTreeImpl(nod, -1, tmpStr);
+  free(tmpStr);
+}
+
+bool inTree(node *nod, char *needle) {
+  node *tmp = nod;
+  for (size_t i = 0; i < wordsLen; i++) {
+    if (tmp->next[getIndex(*needle)] == NULL) {
+      return false;
+    }
+    tmp = tmp->next[getIndex(*needle)];
+    needle++;
+  }
+  return true;
+}
 
 size_t count(char *str, char needle) {
   size_t cont = 0;
@@ -91,16 +157,6 @@ void computeRes(char *r, char *p, char *res) {
   }
 }
 
-bool inInput(char *needle, input *in) {
-
-  char **pr = in->arr;
-  for (size_t j = 0; j < in->len; pr++, j++) {
-    if (strcmp(*pr, needle) == 0)
-      return true;
-  }
-  return false;
-}
-
 bool compatible(char *filter, char *r, char *p) {
   for (size_t i = 0; filter[i] != '\0'; ++i) {
     if (filter[i] == '+' && r[i] != p[i])
@@ -121,154 +177,127 @@ bool compatible(char *filter, char *r, char *p) {
   return strcmp(r, p) != 0;
 }
 
-size_t removeIncompatible(char *filter, input *in, char *str) {
-  size_t cont = 0;
-  size_t pin = 0;
-  //   printf("----------------\n");
-  //   printf("|     %s     |\n", str);
-  //   printf("----------------\n");
+size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
+                              char *tmpStr) {
+  if (nod->connected == 0 && d == wordsLen - 1) {
+    node *tmp = nod;
+    while (tmp->val != '#') {
+      tmpStr[d] = tmp->val;
+      d--;
+      tmp = tmp->prev;
+    }
+#ifdef DEBUG
+    printf("----compatibility test----\n");
+    printf("%s - %s - %s\n", filter, tmpStr, str);
+#endif
+    if (!compatible(filter, tmpStr, str)) {
+#ifdef DEBUG
+      printf("incompatibile\n");
+      printf("--------------------------\n");
+#endif
+      return -1;
+    }
+#ifdef DEBUG
+    else {
+      printf("compatibile\n");
+      printf("--------------------------\n");
+    }
+#endif
+    return -2;
+  }
 
-  LOOP_OVER_INPUT(
-      pin = in->start;
-      ,
-      if (compatible(filter, *pr, str)) {
-        cont++;
-        pin = j + 1;
-        //         printf(">> %s\n", *pr);
-      } else {
-        //         printf("XX %s\n", *pr);
-
-        // se deve saltare su un indice che ha un salto a sua volta,
-        // allora aggiungo i salti del secondo nel primo, ricordati di
-        // ringraziare Luca passato per questa spiegazione :)
-        in->jumps[pin]++;
-        if (pin + in->jumps[pin] < in->len &&
-            in->jumps[pin + in->jumps[pin]] != -1)
-          in->jumps[pin] += in->jumps[pin + in->jumps[pin]];
-      },
-      if (in->jumps[in->start] != 0) in->start += in->jumps[in->start];
-      if (pin + 1 + in->jumps[pin] > in->len) in->jumps[pin] = -1;)
-
-  return cont;
+  for (size_t i = 0; i < ALPHALEN; i++) {
+    if (nod->next[i] != NULL) {
+      //    prob a bug with freeing mem
+      if (nod->next[i]->val != '\0') {
+        size_t ret =
+            removeIncompatibleImpl(filter, nod->next[i], d + 1, str, tmpStr);
+        //             printf("---- %ld %c\n", ret, nod->val);
+        if (ret == (size_t)-1) {
+          nod->next[i]->connected--;
+          if (nod->val != '#') {
+            return (size_t)-1;
+          }
+          nod->connected--;
+        }
+      }
+    }
+  }
+  return nod->connected;
 }
 
-int64_t binSearch(input *in, char *str) {
-  int64_t low = 0, high = in->len - 1, mid;
-
-  while (low <= high) {
-    mid = (low + high) / 2;
-    if (strcmp(str, in->arr[mid]) > 0)
-      low = mid + 1;
-    else
-      high = mid - 1;
-  }
-
-  return low;
+size_t removeIncompatible(char *filter, node *nod, char *str) {
+  char *tmpStr = malloc(sizeof(char) * wordsLen);
+  size_t ret = removeIncompatibleImpl(filter, nod, -1, str, tmpStr);
+  free(tmpStr);
+  return ret;
 }
 
-void insert(input *in, char *str) {
-  int64_t new = binSearch(in, str);
-
-  for (int64_t i = in->len - 1; i != new; i--) {
-    in->arr[i] = in->arr[i - 1];
-    in->jumps[i] = in->jumps[i - 1];
-  }
-
-  in->arr[new] = str;
-  in->jumps[new] = 0;
-
-  int64_t jump = -1;
-  for (int64_t i = 0; i < new; i++) {
-    if (in->jumps[i] != 0)
-      jump = in->jumps[i];
-    jump--;
-  }
-
-  if (jump > 0) {
-    in->jumps[new + 1] += jump;
-    for (int64_t i = new; i >= 0; i--) {
-      if (in->jumps[i] != 0) {
-        in->jumps[i] -= jump;
-        break;
+void resetCounters(node *nod) {
+  nod->connected = 0;
+  for (size_t i = 0; i < ALPHALEN; i++) {
+    if (nod->next[i] != NULL) {
+      //    prob a bug with freeing mem
+      if (nod->next[i]->val != '\0') {
+        nod->connected += 1;
+        resetCounters(nod->next[i]);
       }
     }
   }
 }
 
-int main(int argc, char *argv[]) {
-
-  bool doCount = true;
-  size_t a;
-  char *arg;
-
-  getline(&arg, &a, stdin);
-  size_t wordsLen = strtol(arg, NULL, 10);
-  input *in = malloc(sizeof(input));
-  in->len = 0;
-
-  getline(&arg, &a, stdin);
-  while (!feof(stdin)) {
-    if (strcmp(arg, "+nuova_partita") == 0) {
-      doCount = false;
-      continue;
-    } else if (strcmp(arg, "+inserisci_inizio") == 0) {
-      doCount = true;
-      continue;
-    } else if (strcmp(arg, "+inserisci_fine") == 0) {
-      doCount = false;
-      continue;
+void freeTree(node *nod) {
+  for (size_t i = 0; i < ALPHALEN; i++) {
+    if (nod->next[i] != NULL) {
+      //    prob a bug with freeing mem
+      if (nod->next[i]->val != '\0') {
+        freeTree(nod->next[i]);
+      }
     }
-    if (doCount)
-      in->len++;
-
-    getline(&arg, &a, stdin);
   }
-  printf("%s\n", arg);
-  freopen("a", "r", stdin);
+  free(nod->next);
+  free(nod);
+}
 
-  getline(&arg, &a, stdin);
-  printf("%s\n", arg);
+int main() {
+  char *line;
+  INIT_LINE_BUFFER();
+  fscanf(stdin, "%zu\n", &wordsLen);
+  //   wordsLen = strtol(line, NULL, 10);
+  node *words = initNode(NULL, '#');
 
-  in->arr = malloc(sizeof(char *) * in->len);
+  line = malloc(sizeof(char) * wordsLen);
+  NEW_LINE(line);
+  while (!feof(stdin)) {
+    if (strcmp(line, "+nuova_partita") == 0) {
+      break;
+    }
 
-  char **ptr = in->arr;
-  int64_t len = 0;
-  while (strcmp(arg, "+nuova_partita") != 0) {
-    getline(&arg, &a, stdin);
-    *ptr = arg;
-    ptr++;
-    len++;
+    addWord(words, line);
+    NEW_LINE(line);
   }
-
-  char *referenceWord;
-  getline(&referenceWord, NULL, stdin);
-
-  getline(&arg, &a, stdin);
-  size_t guessesNumber = (size_t)strtol(arg, NULL, 10);
+#ifdef DEBUG
+  printf("---Initial words----------\n");
+  dumpTree(words);
+  printf("--------------------------\n");
+#endif
+  char *referenceWord = malloc(sizeof(char) * wordsLen);
+  NEW_LINE(referenceWord);
+#ifdef DEBUG
+  printf("---Reference word---------\n");
+  printf("%s\n", referenceWord);
+  printf("--------------------------\n");
+#endif
+  NEW_LINE(line);
+  size_t guessesNumber = (size_t)strtol(line, NULL, 10);
+#ifdef DEBUG
+  printf("---guesses number---------\n");
+  printf("%ld\n", guessesNumber);
+  printf("--------------------------\n");
+#endif
 
   bool hasWon = false;
   char *res = malloc(sizeof(char) * wordsLen);
-
-  in->jumps = malloc(sizeof(int64_t) * in->len);
-
-  for (size_t i = 0; i < in->len; i++)
-    *ptr = "~";
-  in->len = len;
-
-  // TODO find something better than insertion sort
-  char *tmp;
-  for (size_t i = 1; i < in->len; i++) {
-    int64_t j = i - 1;
-    tmp = in->arr[i];
-
-    while (j >= 0 && strcmp(tmp, in->arr[j]) < 0) {
-      in->arr[j + 1] = in->arr[j];
-      j--;
-    }
-
-    in->arr[j + 1] = tmp;
-  }
-
   szArr *storedRes = malloc(sizeof(szArr));
   szArr *storedGuesses = malloc(sizeof(szArr));
 
@@ -279,104 +308,126 @@ int main(int argc, char *argv[]) {
     storedGuesses->v[i] = malloc(sizeof(char) * wordsLen);
   }
 
+  NEW_LINE(line);
   while (!feof(stdin)) {
     for (size_t i = 0; guessesNumber > 0; ++i) {
-      if (strcmp("+stampa_filtrate", arg) == 0) {
-        LOOP_OVER_INPUT(;, printf("%s\n", *pr);, ;)
-        getline(&arg, &a, stdin);
-
+#ifdef DEBUG
+      printf("---Input------------------\n");
+      printf("%s\n", line);
+      printf("--------------------------\n");
+#endif
+      if (strcmp("+stampa_filtrate", line) == 0) {
+        dumpTree(words);
+        NEW_LINE(line);
         continue;
 
-      } else if (strcmp("+inserisci_inizio", arg) == 0) {
-        getline(&arg, &a, stdin);
-
-        for (size_t j = 0; j < in->len; j++)
-          if (in->jumps[j] == -1) {
-            in->jumps[j] = in->len - j;
-            break;
-          }
-
-        while (strcmp("+inserisci_fine", arg) != 0) {
-          getline(&arg, &a, stdin);
-          in->len++;
-          insert(in, arg);
+      } else if (strcmp("+inserisci_inizio", line) == 0) {
+#ifdef DEBUG
+        printf("---Input------------------\n");
+#endif
+        NEW_LINE(line);
+        while (strcmp("+inserisci_fine", line) != 0) {
+#ifdef DEBUG
+          printf("%s\n", line);
+#endif
+          addWord(words, line);
+          NEW_LINE(line);
         }
+#ifdef DEBUG
+        printf("---------------------------\n");
+        printf("---Fine--------------------\n");
+#endif
 
         for (size_t j = 0; j < storedRes->len; j++) {
-          removeIncompatible(storedRes->v[j], in, storedGuesses->v[j]);
+          removeIncompatible(storedRes->v[j], words, storedGuesses->v[j]);
         }
 
-        getline(&arg, &a, stdin);
+        NEW_LINE(line);
         continue;
 
-      } else if (strcmp(referenceWord, arg) == 0) {
+      } else if (strcmp(referenceWord, line) == 0) {
+
         printf("ok\n");
         hasWon = true;
-        if (argc > 0)
-          getline(&arg, &a, stdin);
+        if (!feof(stdin)) {
+          NEW_LINE(line);
+        }
+        guessesNumber = 0;
         break;
-      } else if (!inInput(arg, in)) {
+      } else if (!inTree(words, line)) {
         printf("not_exists\n");
-        getline(&arg, &a, stdin);
+        NEW_LINE(line);
         continue;
       }
 
-      computeRes(referenceWord, arg, res);
+      computeRes(referenceWord, line, res);
       storedRes->len++;
       strcpy(storedRes->v[storedRes->len - 1], res);
       storedGuesses->len++;
-      strcpy(storedGuesses->v[storedGuesses->len - 1], arg);
+      strcpy(storedGuesses->v[storedGuesses->len - 1], line);
 
-      size_t remaining = removeIncompatible(res, in, arg);
+      size_t remaining = removeIncompatible(res, words, line);
       printf("%s\n%ld\n", res, remaining);
       guessesNumber--;
-      getline(&arg, &a, stdin);
+      NEW_LINE(line);
     }
 
-    if (!hasWon)
+    if (!hasWon) {
+      hasWon = !hasWon;
       printf("ko\n");
-
-    if (argc == 0)
-      break;
-
-    if (strcmp("+inserisci_inizio", *argv) == 0) {
-      getline(&arg, &a, stdin);
-
-      size_t oldLen = in->len;
-      while (strcmp("+inserisci_fine", *argv) != 0) {
-        getline(&arg, &a, stdin);
-        in->arr[in->len] = "~"; // this is the ASCII max char
-        in->len++;
-      }
-      in->jumps = realloc(in->jumps, sizeof(int64_t) * in->len);
-      for (size_t j = oldLen; j < in->len; j++)
-        in->jumps[j] = 0;
-      char **tmp2 = argv;
-      for (size_t j = in->len - oldLen; j > 0; j--)
-        insert(in, *--tmp2);
-
-      getline(&arg, &a, stdin);
     }
-    if (strcmp("+nuova_partita", *argv) == 0) {
+    if (strcmp("+inserisci_inizio", line) == 0) {
+#ifdef DEBUG
+      printf("---Input------------------\n");
+#endif
+      NEW_LINE(line);
+      while (strcmp("+inserisci_fine", line) != 0) {
+#ifdef DEBUG
+        printf("%s\n", line);
+#endif
+        addWord(words, line);
+        NEW_LINE(line);
+      }
+#ifdef DEBUG
+      printf("---------------------------\n");
+      printf("---Fine--------------------\n");
+#endif
+
+      for (size_t j = 0; j < storedRes->len; j++) {
+        removeIncompatible(storedRes->v[j], words, storedGuesses->v[j]);
+      }
+
+      NEW_LINE(line);
+      continue;
+    }
+    if (strcmp("+nuova_partita", line) == 0) {
+      resetCounters(words);
+#ifdef DEBUG
+      printf("---Initial words----------\n");
+      dumpTree(words);
+      printf("--------------------------\n");
+#endif
+      NEW_LINE(referenceWord);
+#ifdef DEBUG
+      printf("---Reference word---------\n");
+      printf("%s\n", referenceWord);
+      printf("--------------------------\n");
+#endif
+      NEW_LINE(line);
+      guessesNumber = (size_t)strtol(line, NULL, 10);
+#ifdef DEBUG
+      printf("---guesses number---------\n");
+      printf("%ld\n", guessesNumber);
+      printf("--------------------------\n");
+#endif
       storedRes->len = 0;
       storedGuesses->len = 0;
-      for (size_t i = 0; i < in->len; i++)
-        in->jumps[i] = 0;
-      in->start = 0;
-      getline(&arg, &a, stdin);
-      referenceWord = *argv;
-      getline(&arg, &a, stdin);
-      guessesNumber = strtol(*argv, NULL, 10);
     }
-    getline(&arg, &a, stdin);
+    NEW_LINE(line);
   }
   // TODO Free everything
   free(res);
-  //  TODO find a way to free in->arr, not that important, leak is only 8
-  //  bytes
-  //   free(in->arr);
-  free(in->jumps);
-  free(in);
+  freeTree(words);
   for (size_t i = 0; i < storedRes->len; i++) {
     free(storedRes->v[i]);
     free(storedGuesses->v[i]);
@@ -385,6 +436,5 @@ int main(int argc, char *argv[]) {
   free(storedGuesses->v);
   free(storedRes);
   free(storedGuesses);
-
   return 0;
 }

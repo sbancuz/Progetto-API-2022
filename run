@@ -1,5 +1,10 @@
- #!/bin/sh
+#!/bin/sh
 
-CFLAGS="-Wall -Wextra -Wshadow -Werror -std=gnu11 -pedantic -ggdb -O2"
+CFLAGS="-Wall -Wextra -Wshadow -Werror -std=gnu11 -pedantic -ggdb"
 clear
-gcc $CFLAGS -o $1 $1.c && time ./$1 <<< $(< ./open_testcases/$2.txt) #>out.txt && diff ./open_testcases/$2.output.txt out.txt
+if [ -z $3 ]; then
+  OPT="";
+else
+  OPT="-D DEBUG";
+fi
+gcc $OPT $CFLAGS -o $1 $1.c && time ./$1 <<< $(< ./open_testcases/$2.txt) #>out.txt && diff ./open_testcases/$2.output.txt out.txt
