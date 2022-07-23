@@ -105,7 +105,7 @@ void addWord(node *nod, char *str) {
 void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
   if (nod->connected == 0 && d == wordsLen - 1) {
     tmpStr[d] = nod->val;
-
+    tmpStr[d + 1] = '\0';
     printf("%s\n", tmpStr);
     return;
   }
@@ -119,7 +119,7 @@ void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
 }
 
 void dumpTree(node *nod) {
-  char *tmpStr = malloc(sizeof(char) * wordsLen);
+  char *tmpStr = malloc(sizeof(char) * (wordsLen + 1));
   dumpTreeImpl(nod, -1, tmpStr);
 }
 
@@ -190,9 +190,17 @@ void computeRes(char *r, char *p, char *res) {
 
 bool compatible(char *filter, char *r, char *p) {
   size_t n = 0, c = 0, s = 0;
+  bool sameStr = true;
   for (size_t i = 0; filter[i] != '\0'; ++i) {
-    if (filter[i] == '+' && r[i] != p[i])
-      return false;
+    if (p[i] != r[i])
+      sameStr = false;
+
+    if (filter[i] == '+') {
+      if (r[i] != p[i])
+        return false;
+      else
+        continue;
+    }
 
     n = 0;
     c = 0;
@@ -200,11 +208,10 @@ bool compatible(char *filter, char *r, char *p) {
     for (size_t j = 0; filter[j] != '\0'; ++j) {
       if (j < i && p[j] == p[i] && p[j] != r[j])
         s++;
-
+      if (r[j] == p[i] && p[j] == r[j]) {
+        c++;
+      }
       if (p[i] == r[j]) {
-        if (p[j] == r[j]) {
-          c++;
-        }
         n++;
       }
     }
@@ -212,20 +219,26 @@ bool compatible(char *filter, char *r, char *p) {
 #ifdef DEBUG
     printf(" %c - n = %ld, c = %ld, s = %ld\n", p[i], n, c, s);
 #endif
-    if (filter[i] == '|' && (r[i] == p[i] || n == 0 || s >= n - c))
-      return false;
+    if (filter[i] == '|') {
+      if ((r[i] == p[i] || n == 0 || s >= n - c))
+        return false;
+      else
+        continue;
+    }
 
-    if (filter[i] == '/' && (s < n - c || (n != 0 && s == 0)))
+    if (filter[i] == '/' && (s < n - c || (n != 0 && r[i] == p[i])))
       return false;
   }
 
-  return strcmp(r, p) != 0;
+  return !sameStr;
 }
 
 size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
                               char *tmpStr) {
   if (nod->connected == 0 && d == wordsLen - 1) {
     tmpStr[d] = nod->val;
+    tmpStr[d + 1] = '\0';
+
 #ifdef DEBUG
     printf("----compatibility test----\n");
     printf("%s - %s - %s\n", filter, tmpStr, str);
@@ -264,7 +277,7 @@ size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
 }
 
 size_t removeIncompatible(char *filter, node *nod, char *str) {
-  char *tmpStr = malloc(sizeof(char) * wordsLen);
+  char *tmpStr = malloc(sizeof(char) * (wordsLen + 1));
   size_t ret = removeIncompatibleImpl(filter, nod, -1, str, tmpStr);
   //   free(tmpStr);
   return ret;
@@ -388,8 +401,6 @@ int main() {
         continue;
 
       } else if (strcmp(referenceWord, line) == 0) {
-
-        printf("ok\n");
         hasWon = true;
         if (!feof(stdin)) {
           NEW_LINE(line);
@@ -416,15 +427,14 @@ int main() {
       strcpy(storedGuesses->v[storedGuesses->len - 1], line);
 
       size_t remaining = removeIncompatible(res, words, line);
-      printf("%s\n%ld\n", res, remaining);
+            printf("%s\n%ld\n", res, remaining);
+
       guessesNumber--;
       NEW_LINE(line);
     }
+    printf("%s\n", hasWon ? "ok" : "ko");
+    hasWon = false;
 
-    if (!hasWon) {
-      hasWon = !hasWon;
-      printf("ko\n");
-    }
     if (strcmp("+inserisci_inizio", line) == 0) {
 #ifdef DEBUG
       printf("---Input------------------\n");
