@@ -18,9 +18,9 @@
 
 #define SET_BIT(m, i) m = ((uint64_t)1 << i) | m
 #define GET_BIT(m, i) (m >> i) & 1
+
 typedef struct node_s {
   struct node_s **next;
-  struct node_s *prev;
   uint64_t mask;
   uint32_t connected;
   uint8_t lenght;
@@ -59,14 +59,13 @@ size_t getIndex(char c, uint64_t mask) {
   return cont;
 }
 
-void *initNode(node *prev, char c) {
+void *initNode(char c) {
   node *n = malloc(sizeof(node));
   n->val = c;
   n->mask = 0;
   n->connected = 0;
   n->lenght = 0;
   n->next = malloc(sizeof(node));
-  n->prev = prev;
   return (void *)n;
 }
 
@@ -89,7 +88,7 @@ void addWord(node *nod, char *str) {
       for (size_t i = nod->lenght; i > newInd; i--)
         nod->next[i] = nod->next[i - 1];
 
-    nod->next[newInd] = initNode(nod, *str);
+    nod->next[newInd] = initNode(*str);
     nod->lenght++;
   }
   SET_BIT(nod->mask, mapCharToIndex(*str));
@@ -105,12 +104,7 @@ void addWord(node *nod, char *str) {
 
 void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
   if (nod->connected == 0 && d == wordsLen - 1) {
-    node *tmp = nod;
-    while (tmp->val != '#') {
-      tmpStr[d] = tmp->val;
-      d--;
-      tmp = tmp->prev;
-    }
+    tmpStr[d] = nod->val;
 
     printf("%s\n", tmpStr);
     return;
@@ -119,6 +113,7 @@ void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
   for (size_t i = 0; i < nod->lenght; i++) {
     if (nod->next[i]->connected == 0 && d < wordsLen - 2)
       continue;
+    tmpStr[d] = nod->val;
     dumpTreeImpl(nod->next[i], d + 1, tmpStr);
   }
 }
@@ -126,7 +121,6 @@ void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
 void dumpTree(node *nod) {
   char *tmpStr = malloc(sizeof(char) * wordsLen);
   dumpTreeImpl(nod, -1, tmpStr);
-  free(tmpStr);
 }
 
 bool inTree(node *nod, char *needle) {
@@ -217,12 +211,7 @@ bool compatible(char *filter, char *r, char *p) {
 size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
                               char *tmpStr) {
   if (nod->connected == 0 && d == wordsLen - 1) {
-    node *tmp = nod;
-    while (tmp->val != '#') {
-      tmpStr[d] = tmp->val;
-      d--;
-      tmp = tmp->prev;
-    }
+    tmpStr[d] = nod->val;
 #ifdef DEBUG
     printf("----compatibility test----\n");
     printf("%s - %s - %s\n", filter, tmpStr, str);
@@ -246,6 +235,7 @@ size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
   for (size_t i = 0; i < nod->lenght; i++) {
     if (nod->next[i]->connected == 0 && d < wordsLen - 2)
       continue;
+    tmpStr[d] = nod->val;
     size_t ret =
         removeIncompatibleImpl(filter, nod->next[i], d + 1, str, tmpStr);
     if (ret == (size_t)-1) {
@@ -262,7 +252,7 @@ size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
 size_t removeIncompatible(char *filter, node *nod, char *str) {
   char *tmpStr = malloc(sizeof(char) * wordsLen);
   size_t ret = removeIncompatibleImpl(filter, nod, -1, str, tmpStr);
-  free(tmpStr);
+//   free(tmpStr);
   return ret;
 }
 
@@ -291,7 +281,7 @@ int main() {
 
   //   (void) fscanf(stdin, "%zu\n", &wordsLen);
   wordsLen = strtol(line, NULL, 10);
-  node *words = initNode(NULL, '#');
+  node *words = initNode('#');
 
   line = malloc(sizeof(char) * wordsLen);
   NEW_LINE(line);
@@ -336,6 +326,8 @@ int main() {
   szArr *storedRes = malloc(sizeof(szArr));
   szArr *storedGuesses = malloc(sizeof(szArr));
 
+  storedRes->len = 0;
+  storedGuesses->len = 0;
   storedRes->v = malloc(sizeof(char *) * guessesNumber);
   storedGuesses->v = malloc(sizeof(char *) * guessesNumber);
   for (size_t i = 0; i < guessesNumber; i++) {
@@ -479,15 +471,15 @@ int main() {
     NEW_LINE(line);
   }
   // TODO Free everything
-  free(res);
-  freeTree(words);
-  for (size_t i = 0; i < storedRes->len; i++) {
-    free(storedRes->v[i]);
-    free(storedGuesses->v[i]);
-  }
-  free(storedRes->v);
-  free(storedGuesses->v);
-  free(storedRes);
-  free(storedGuesses);
+//   free(res);
+//   freeTree(words);
+//   for (size_t i = 0; i < storedRes->len; i++) {
+//     free(storedRes->v[i]);
+//     free(storedGuesses->v[i]);
+//   }
+//   free(storedRes->v);
+//   free(storedGuesses->v);
+//   free(storedRes);
+//   free(storedGuesses);
   return 0;
 }
