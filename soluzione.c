@@ -170,6 +170,7 @@ size_t countScorr(char *str, char *str2, size_t len, char needle) {
 }
 
 void computeRes(char *r, char *p, char *res) {
+  size_t c = 0, s = 0;
   for (size_t i = 0; r[i] != '\0'; ++i) {
     size_t n = count(r, p[i]);
     if (r[i] == p[i]) {
@@ -177,8 +178,14 @@ void computeRes(char *r, char *p, char *res) {
     } else if (n == 0)
       res[i] = '/';
     else {
-      size_t c = countCorr(r, p, p[i]);
-      size_t s = countScorr(p, r, i, p[i]);
+      c = 0;
+      s = 0;
+      for (size_t j = 0; r[j] != '\0'; ++j) {
+        if (j < i && p[j] == p[i] && p[j] != r[j])
+          s++;
+        if (p[i] == r[j] && p[j] == r[j])
+          c++;
+      }
 
       if (s >= (n - c))
         res[i] = '/';
@@ -208,10 +215,9 @@ bool compatible(char *filter, char *r, char *p) {
     for (size_t j = 0; filter[j] != '\0'; ++j) {
       if (j < i && p[j] == p[i] && p[j] != r[j])
         s++;
-      if (r[j] == p[i] && p[j] == r[j]) {
-        c++;
-      }
       if (p[i] == r[j]) {
+        if (p[j] == r[j])
+          c++;
         n++;
       }
     }
@@ -427,7 +433,7 @@ int main() {
       strcpy(storedGuesses->v[storedGuesses->len - 1], line);
 
       size_t remaining = removeIncompatible(res, words, line);
-            printf("%s\n%ld\n", res, remaining);
+      printf("%s\n%ld\n", res, remaining);
 
       guessesNumber--;
       NEW_LINE(line);
