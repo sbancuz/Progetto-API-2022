@@ -134,11 +134,11 @@ bool inTree(node *nod, char *needle) {
   }
   return true;
 }
-
 size_t count(char *str, char needle) {
   size_t cont = 0;
 
   for (size_t i = 0; str[i] != '\0'; ++i) {
+    //       printf("----%c %c\n", str[i], needle);
     if (str[i] == needle)
       cont++;
   }
@@ -189,15 +189,29 @@ void computeRes(char *r, char *p, char *res) {
 }
 
 bool compatible(char *filter, char *r, char *p) {
+  size_t n = 0, c = 0, s = 0;
   for (size_t i = 0; filter[i] != '\0'; ++i) {
     if (filter[i] == '+' && r[i] != p[i])
       return false;
 
-    size_t n = count(r, p[i]);
-    size_t c = countCorr(r, p, p[i]);
-    size_t s = countScorr(p, r, i, p[i]);
-    //     printf(" %c - n = %ld, c = %ld, s = %ld\n", p[i], n, c, s);
+    n = 0;
+    c = 0;
+    s = 0;
+    for (size_t j = 0; filter[j] != '\0'; ++j) {
+      if (j < i && p[j] == p[i] && p[j] != r[j])
+        s++;
 
+      if (p[i] == r[j]) {
+        if (p[j] == r[j]) {
+          c++;
+        }
+        n++;
+      }
+    }
+
+#ifdef DEBUG
+    printf(" %c - n = %ld, c = %ld, s = %ld\n", p[i], n, c, s);
+#endif
     if (filter[i] == '|' && (r[i] == p[i] || n == 0 || s >= n - c))
       return false;
 
@@ -252,7 +266,7 @@ size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
 size_t removeIncompatible(char *filter, node *nod, char *str) {
   char *tmpStr = malloc(sizeof(char) * wordsLen);
   size_t ret = removeIncompatibleImpl(filter, nod, -1, str, tmpStr);
-//   free(tmpStr);
+  //   free(tmpStr);
   return ret;
 }
 
@@ -471,15 +485,15 @@ int main() {
     NEW_LINE(line);
   }
   // TODO Free everything
-//   free(res);
-//   freeTree(words);
-//   for (size_t i = 0; i < storedRes->len; i++) {
-//     free(storedRes->v[i]);
-//     free(storedGuesses->v[i]);
-//   }
-//   free(storedRes->v);
-//   free(storedGuesses->v);
-//   free(storedRes);
-//   free(storedGuesses);
+  //   free(res);
+  //   freeTree(words);
+  //   for (size_t i = 0; i < storedRes->len; i++) {
+  //     free(storedRes->v[i]);
+  //     free(storedGuesses->v[i]);
+  //   }
+  //   free(storedRes->v);
+  //   free(storedGuesses->v);
+  //   free(storedRes);
+  //   free(storedGuesses);
   return 0;
 }

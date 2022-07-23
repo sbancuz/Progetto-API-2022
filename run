@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CFLAGS="-Wall -Wextra -Wshadow -Werror -Werror=unused-result -g3 -std=gnu11 -pedantic"
+CFLAGS="-Wall -Wextra -Wshadow -Werror -Werror=unused-result -g3 -std=gnu11 -pedantic -O2"
 clear
 if [ -z $3 ]; then
   OPT="";
