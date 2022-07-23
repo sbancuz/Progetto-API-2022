@@ -115,7 +115,10 @@ void dumpTreeImpl(node *nod, size_t d, char *tmpStr) {
     printf("%s\n", tmpStr);
     return;
   }
+
   for (size_t i = 0; i < nod->lenght; i++) {
+    if (nod->next[i]->connected == 0 && d < wordsLen - 2)
+      continue;
     dumpTreeImpl(nod->next[i], d + 1, tmpStr);
   }
 }
@@ -241,6 +244,8 @@ size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
   }
 
   for (size_t i = 0; i < nod->lenght; i++) {
+    if (nod->next[i]->connected == 0 && d < wordsLen - 2)
+      continue;
     size_t ret =
         removeIncompatibleImpl(filter, nod->next[i], d + 1, str, tmpStr);
     if (ret == (size_t)-1) {
@@ -461,7 +466,8 @@ int main() {
 #endif
       if (storedRes->len < guessesNumber) {
         storedRes->v = realloc(storedRes->v, sizeof(char *) * guessesNumber);
-        storedGuesses->v = realloc(storedGuesses->v, sizeof(char *) * guessesNumber);
+        storedGuesses->v =
+            realloc(storedGuesses->v, sizeof(char *) * guessesNumber);
         for (size_t i = storedRes->len; i < guessesNumber; i++) {
           storedRes->v[i] = malloc(sizeof(char) * wordsLen);
           storedGuesses->v[i] = malloc(sizeof(char) * wordsLen);
