@@ -33,28 +33,40 @@ typedef struct sizedArr_s {
 } szArr;
 
 size_t wordsLen;
+uint8_t maskRefs[UINT8_MAX + 1] = {
+    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4,
+    2, 3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 1, 2, 2, 3, 2, 3, 3, 4,
+    2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6,
+    4, 5, 5, 6, 5, 6, 6, 7, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5,
+    3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6,
+    4, 5, 5, 6, 5, 6, 6, 7, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+    4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8};
 
-size_t mapCharToIndex(char c) {
-  if (c >= '0' && c <= '9')
-    return c - '0' + 1;
-  if (c >= 'a' && c <= 'z')
-    return c - 'a' + 38;
-  if (c >= 'A' && c <= 'Z')
-    return c - 'A' + 11;
-  if (c == '-')
-    return 0;
-  if (c == '_')
-    return 37;
+uint8_t alph[INT8_MAX] = {
+    65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+    65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+    65, 65, 65, 65, 65, 65, 65, 0,  65, 65, 1,  2,  3,  4,  5,  6,  7,  8,  9,
+    10, 65, 65, 65, 65, 65, 65, 65, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+    22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 65, 65, 65, 65,
+    37, 65, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54,
+    55, 56, 57, 58, 59, 60, 61, 62, 63, 65, 65, 65, 65};
 
-  return ALPHALEN + 1;
-}
+uint16_t *no;
+uint16_t *co;
+uint16_t *sc;
 
 size_t getIndex(char c, uint64_t mask) {
-  size_t target = mapCharToIndex(c);
-  assert(target < 65);
+  size_t target = alph[(uint8_t)c];
   size_t cont = 0;
-  for (size_t i = 0; i < target; i++) {
-    cont += (mask >> i) & 1;
+  for (size_t i = 0; i < target / 8; i++) {
+    cont += maskRefs[(mask >> (i * 8)) & 0xFF];
+  }
+  for (size_t i = 0; i < target % 8; i++) {
+    cont += (mask >> (target - i - 1)) & 1;
   }
   return cont;
 }
@@ -76,7 +88,7 @@ void addWord(node *nod, char *str) {
   printf("%c - %zu - %ld - %d\n", *str, nod->mask, getIndex(*str, nod->mask),
          nod->lenght);
 #endif
-  if (nod->lenght == 0 || ((GET_BIT(nod->mask, mapCharToIndex(*str))) == 0) ||
+  if (nod->lenght == 0 || ((GET_BIT(nod->mask, alph[(uint8_t)*str])) == 0) ||
       (nod->next[getIndex(*str, nod->mask)]->val != *str)) {
 #ifdef DEBUG
     printf("+++%c\n", *str);
@@ -91,7 +103,7 @@ void addWord(node *nod, char *str) {
     nod->next[newInd] = initNode(*str);
     nod->lenght++;
   }
-  SET_BIT(nod->mask, mapCharToIndex(*str));
+  SET_BIT(nod->mask, alph[(uint8_t)*str]);
 
   nod->connected++;
   char c = *str;
@@ -126,7 +138,7 @@ void dumpTree(node *nod) {
 bool inTree(node *nod, char *needle) {
   node *tmp = nod;
   for (size_t i = 0; i < wordsLen; i++) {
-    if ((GET_BIT(tmp->mask, mapCharToIndex(*needle))) == 0) {
+    if ((GET_BIT(tmp->mask, alph[(uint8_t)*needle])) == 0) {
       return false;
     }
     tmp = tmp->next[getIndex(*needle, tmp->mask)];
@@ -134,6 +146,7 @@ bool inTree(node *nod, char *needle) {
   }
   return true;
 }
+
 size_t count(char *str, char needle) {
   size_t cont = 0;
 
@@ -221,6 +234,7 @@ bool compatible(char *filter, char *r, char *p) {
         n++;
       }
     }
+    printf(" %c - n = %ld, c = %ld, s = %ld\n", p[i], n, c, s);
 
 #ifdef DEBUG
     printf(" %c - n = %ld, c = %ld, s = %ld\n", p[i], n, c, s);
@@ -239,38 +253,69 @@ bool compatible(char *filter, char *r, char *p) {
   return !sameStr;
 }
 
+
+
 size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
                               char *tmpStr) {
   if (nod->connected == 0 && d == wordsLen - 1) {
     tmpStr[d] = nod->val;
     tmpStr[d + 1] = '\0';
-
-#ifdef DEBUG
-    printf("----compatibility test----\n");
-    printf("%s - %s - %s\n", filter, tmpStr, str);
-#endif
-    if (!compatible(filter, tmpStr, str)) {
-#ifdef DEBUG
-      printf("incompatibile\n");
-      printf("--------------------------\n");
-#endif
+    bool sameStr = true;
+    if ((filter[d] == '+' && tmpStr[d] != str[d]) ||
+        (filter[d] == '|' && tmpStr[d] == str[d]) ||
+        (filter[d] == '/' && no[alph[(uint8_t)str[d]]] != 0 &&
+         tmpStr[d] == str[d]))
       return -1;
+
+    for (size_t i = 0; filter[i] != '\0'; i++) {
+      if (str[i] != tmpStr[i])
+        sameStr = false;
+
+      size_t ind = alph[(uint8_t)str[i]];
+      if (filter[i] == '|') {
+        if ((no[ind] == 0 || sc[i] >= no[ind] - co[ind])) {
+          return -1;
+        } else
+          continue;
+      }
+
+      if (filter[i] == '/' && (sc[i] < no[ind] - co[ind])) {
+        return -1;
+      }
     }
-#ifdef DEBUG
-    else {
-      printf("compatibile\n");
-      printf("--------------------------\n");
-    }
-#endif
-    return -2;
+
+    return sameStr ? -1 : -2;
   }
 
   for (size_t i = 0; i < nod->lenght; i++) {
     if (nod->next[i]->connected == 0 && d < wordsLen - 2)
       continue;
     tmpStr[d] = nod->val;
-    size_t ret =
-        removeIncompatibleImpl(filter, nod->next[i], d + 1, str, tmpStr);
+    size_t ret;
+    if (!((filter[d] == '+' && tmpStr[d] != str[d]) ||
+          (filter[d] == '|' && tmpStr[d] == str[d]) ||
+          (filter[d] == '/' && no[alph[(uint8_t)str[d]]] != 0 &&
+           tmpStr[d] == str[d]))) {
+
+      no[alph[(uint8_t)nod->next[i]->val]]++;
+
+      if (nod->next[i]->val == str[d + 1])
+        co[alph[(uint8_t)nod->next[i]->val]]++;
+      else {
+        for (int32_t j = d; j >= 0; j--) {
+          if (str[d + 1] == str[j] && str[j] != tmpStr[j]) {
+            sc[d + 1]++;
+          }
+        }
+      }
+      ret = removeIncompatibleImpl(filter, nod->next[i], d + 1, str, tmpStr);
+      no[alph[(uint8_t)nod->next[i]->val]]--;
+      if (nod->next[i]->val == str[d + 1])
+        co[alph[(uint8_t)nod->next[i]->val]]--;
+      else
+        sc[d + 1] = 0;
+    } else
+      ret = (size_t)-1;
     if (ret == (size_t)-1) {
       nod->next[i]->connected--;
       if (nod->val != '#')
@@ -284,9 +329,7 @@ size_t removeIncompatibleImpl(char *filter, node *nod, size_t d, char *str,
 
 size_t removeIncompatible(char *filter, node *nod, char *str) {
   char *tmpStr = malloc(sizeof(char) * (wordsLen + 1));
-  size_t ret = removeIncompatibleImpl(filter, nod, -1, str, tmpStr);
-  //   free(tmpStr);
-  return ret;
+  return removeIncompatibleImpl(filter, nod, -1, str, tmpStr);
 }
 
 uint32_t resetCounters(node *nod) {
@@ -309,13 +352,21 @@ void freeTree(node *nod) {
 
 int main() {
   char *line;
+  no = malloc(sizeof(uint16_t) * ALPHALEN);
+  co = malloc(sizeof(uint16_t) * ALPHALEN);
+  sc = malloc(sizeof(uint16_t) * wordsLen);
   INIT_LINE_BUFFER();
   NEW_LINE(line);
 
   //   (void) fscanf(stdin, "%zu\n", &wordsLen);
   wordsLen = strtol(line, NULL, 10);
   node *words = initNode('#');
-
+  for (size_t i = 0; i < ALPHALEN; i++) {
+    no[i] = 0;
+    co[i] = 0;
+    if (i < wordsLen)
+      sc[i] = 0;
+  }
   line = malloc(sizeof(char) * wordsLen);
   NEW_LINE(line);
 #ifdef DEBUG
@@ -355,6 +406,7 @@ int main() {
 #endif
 
   bool hasWon = false;
+  bool finished = false;
   char *res = malloc(sizeof(char) * wordsLen);
   szArr *storedRes = malloc(sizeof(szArr));
   szArr *storedGuesses = malloc(sizeof(szArr));
@@ -376,7 +428,6 @@ int main() {
       printf("%s\n", line);
       printf("--------------------------\n");
 #endif
-
       if (strcmp("+stampa_filtrate", line) == 0) {
         dumpTree(words);
         NEW_LINE(line);
@@ -397,6 +448,7 @@ int main() {
 #ifdef DEBUG
         printf("---------------------------\n");
         printf("---Fine--------------------\n");
+        printf("aaa\n");
 #endif
 
         for (size_t j = 0; j < storedRes->len; j++) {
@@ -425,8 +477,8 @@ int main() {
         NEW_LINE(line);
         continue;
       }
-
       computeRes(referenceWord, line, res);
+      res[wordsLen] = '\0';
       storedRes->len++;
       strcpy(storedRes->v[storedRes->len - 1], res);
       storedGuesses->len++;
@@ -434,12 +486,14 @@ int main() {
 
       size_t remaining = removeIncompatible(res, words, line);
       printf("%s\n%ld\n", res, remaining);
-
       guessesNumber--;
       NEW_LINE(line);
     }
-    printf("%s\n", hasWon ? "ok" : "ko");
-    hasWon = false;
+    if (!finished) {
+      printf("%s\n", hasWon ? "ok" : "ko");
+      hasWon = false;
+      finished = true;
+    }
 
     if (strcmp("+inserisci_inizio", line) == 0) {
 #ifdef DEBUG
@@ -450,6 +504,8 @@ int main() {
 #ifdef DEBUG
         printf("%s\n", line);
 #endif
+        // does't matter if it's compatibile or not because it's going to be
+        // reset after
         addWord(words, line);
         NEW_LINE(line);
       }
@@ -497,6 +553,7 @@ int main() {
       }
       storedRes->len = 0;
       storedGuesses->len = 0;
+      finished = false;
     }
     NEW_LINE(line);
   }
