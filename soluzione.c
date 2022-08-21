@@ -15,7 +15,7 @@
   ssize_t input_string_lenght = 0
 
 #define NEW_LINE(a)                                                            \
-  input_string_lenght = getline(&a, &len, stdin);                                     \
+  input_string_lenght = getline(&a, &len, stdin);                              \
   a[input_string_lenght - 1] = '\0'
 
 #define SET_BIT(m, i) m = ((uint64_t)1 << i) | m
@@ -103,8 +103,9 @@ void *init_node(char *c, uint32_t len) {
   return (void *)n;
 }
 
-size_t get_inlined_index(node *nod, char c, size_t inline_lenght) {
-  for (size_t i = nod->node_lenght + 1; i + 1 < nod->str_lenght; i += 1 + inline_lenght) {
+inline size_t get_inlined_index(node *nod, char c, size_t inline_lenght) {
+  for (size_t i = nod->node_lenght + 1; i + 1 < nod->str_lenght;
+       i += 1 + inline_lenght) {
     if (*(nod->str + i + 1) == c)
       return i;
   }
@@ -141,28 +142,39 @@ void add_word(node *nod, char *new_word) {
       if (nod->str[same_chars] == '\0') {
 
         if ((GET_BIT(nod->mask, alph[(uint8_t) * (new_word + i)])) == 1) {
-          node *parent = nod;
+          //           node *parent = nod;
           nod = nod->next[get_index(*(new_word + i), nod->mask)];
+          same_chars = 0;
           if (nod->node_lenght == 1) {
-            same_chars = 0;
             i--;
             continue;
           }
+          while (nod->str[same_chars] == new_word[same_chars + i])
+            same_chars++;
+
+          i += same_chars;
+
           if (same_chars != nod->node_lenght) {
-            if ((GET_BIT(parent->mask, alph[(uint8_t) * (new_word + i)])) == 1 &&
-                same_chars == 1) {
-              i += same_chars;
+            // se inline_lenght nuova è diversa dalla vecchia allora faccio
+            // in-between
+            if ((words_lenght - i !=
+                       (nod->str_lenght - nod->node_lenght - 2) /
+                           (words_lenght - nod->node_lenght + 1))) {
               state = MAKE_INBETWEEN_NODE;
-            } else
+            } else if ((inline_index = get_inlined_index(nod, *(new_word + i),
+                                                  words_lenght - i)) != 0) {
+              state = CUT_FROM_INLINE;
+              break;
+            } else {
               state = INIT_INLINE;
+            }
             break;
           } else {
-            i += same_chars;
             state = ADD_TO_INLINE;
             break;
           }
         } else if ((inline_index = get_inlined_index(nod, *(new_word + i),
-                                                words_lenght - i)) != 0) {
+                                                     words_lenght - i)) != 0) {
           state = CUT_FROM_INLINE;
           break;
         } else {
@@ -188,11 +200,13 @@ void add_word(node *nod, char *new_word) {
   node *tmp_node;
   uint16_t new_index_in_inline = 0;
   size_t new_next_index;
-  size_t new_inlined_lenght = words_lenght - i, new_nodeLen = 0;
+  size_t new_inlined_lenght = words_lenght - i, new_node_lenght = 0;
   while (state != NOTHING_TO_DO) {
     switch (state) {
     case NEW_NODE_FROM_ROOT:
-//       printf("NEW_NODE_FROM_ROOT\n");
+#ifdef DEBUG
+      printf("NEW_NODE_FROM_ROOT\n");
+#endif
 
       nod->next = realloc(nod->next, sizeof(node) * (nod->connected_nodes + 1));
       new_next_index = get_index(new_word[0], nod->mask);
@@ -207,7 +221,9 @@ void add_word(node *nod, char *new_word) {
       state = NOTHING_TO_DO;
       break;
     case INIT_INLINE:
-//       printf("INIT_INLINE\n");
+#ifdef DEBUG
+      printf("INIT_INLINE\n");
+#endif
 
       if (same_chars == 0)
         same_chars = i;
@@ -217,6 +233,7 @@ void add_word(node *nod, char *new_word) {
       nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
       memcpy(nod->str + same_chars + 2, nod->str + same_chars,
              sizeof(char) * (nod->node_lenght - same_chars));
+
       nod->node_lenght = same_chars;
       nod->str[same_chars + 1] = '#';
       nod->str[nod->str_lenght - 1] = '\0';
@@ -224,28 +241,47 @@ void add_word(node *nod, char *new_word) {
       state = ADD_TO_INLINE;
       continue;
     case ADD_TO_INLINE:
-//       printf("ADD_TO_INLINE\n");
-
-      new_index_in_inline = nod->str_lenght;
+#ifdef DEBUG
+      printf("ADD_TO_INLINE\n");
+#endif
+      new_index_in_inline = -1;
       nod->str_lenght += words_lenght - i + 1;
       nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
       new_inlined_lenght = words_lenght - i;
+
       // slide to the right to order
-      for (uint16_t j = nod->str_lenght - (new_inlined_lenght + 1);
-           j > nod->node_lenght + 3 + new_inlined_lenght + 1; j -= (1 + new_inlined_lenght)) {
-        if (*(nod->str + j) < *(new_word + i)) {
-          memcpy(nod->str + j, nod->str + j - (new_inlined_lenght + 1),
-                 sizeof(char) * new_inlined_lenght + 1);
-          new_index_in_inline -= 1 + new_inlined_lenght;
+      for (uint16_t j = nod->node_lenght + 1;
+           j < nod->str_lenght - new_inlined_lenght - 1;
+           j += new_inlined_lenght + 1) {
+        if (nod->str[j + 1] > new_word[i]) {
+          new_index_in_inline = j;
+          break;
         }
       }
-      nod->str[new_index_in_inline - 1] = '#';
-      memcpy(nod->str + new_index_in_inline, new_word + i, sizeof(char) * (new_inlined_lenght));
+      if (new_index_in_inline == (uint16_t)-1)
+        new_index_in_inline = nod->str_lenght - new_inlined_lenght - 2;
+
+      //       printf("pre > %s\n", nod->str + nod->node_lenght + 1);
+      memcpy(nod->str + new_index_in_inline + new_inlined_lenght + 1,
+             nod->str + new_index_in_inline,
+             sizeof(char) * (nod->str_lenght - new_index_in_inline -
+                             new_inlined_lenght - 1));
+      // printf("%d - %ld\n",new_index_in_inline, nod->str_lenght -
+      // new_index_in_inline + new_inlined_lenght); printf("mid > %s\n",
+      // nod->str + nod->node_lenght + 1);
+      nod->str[new_index_in_inline] = '#';
+      //       printf("%s\n", nod->str + new_index_in_inline);
+      //       printf("%s\n", nod->str + nod->node_lenght + 5);
+      memcpy(nod->str + new_index_in_inline + 1, new_word + i,
+             sizeof(char) * (new_inlined_lenght));
+      // printf("aft > %s\n", nod->str + nod->node_lenght + 1);
       nod->str[nod->str_lenght - 1] = '\0';
       state = NOTHING_TO_DO;
       break;
     case CUT_NODE:
-//       printf("CUT_NODE\n");
+#ifdef DEBUG
+      printf("CUT_NODE\n");
+#endif
 
       new_node = init_node(nod->str, same_chars);
       tmp_node = malloc(sizeof(node));
@@ -255,7 +291,8 @@ void add_word(node *nod, char *new_word) {
       nod->str = memmove(nod->str, nod->str + same_chars,
                          sizeof(char) * (nod->str_lenght));
       nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
-      nod->str[same_chars] = '\0';
+      nod->str[nod->node_lenght] = '\0';
+
       tmp_node = memcpy(tmp_node, new_node, sizeof(node));
       new_node = memcpy(new_node, nod, sizeof(node));
       nod = memcpy(nod, tmp_node, sizeof(node));
@@ -279,16 +316,19 @@ void add_word(node *nod, char *new_word) {
       state = NOTHING_TO_DO;
       break;
     case MAKE_INBETWEEN_NODE:
-//       printf("MAKE_INBETWEEN_NODE\n");
+#ifdef DEBUG
+      printf("MAKE_INBETWEEN_NODE\n");
+#endif
       new_node = init_node(nod->str, same_chars);
       tmp_node = malloc(sizeof(node));
       nod->node_lenght -= same_chars;
-      nod->str_lenght -= same_chars;
+      nod->str_lenght  -= same_chars;
 
       nod->str = memmove(nod->str, nod->str + same_chars,
                          sizeof(char) * (nod->str_lenght));
+
       nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
-      nod->str[same_chars] = '\0';
+      nod->str[nod->node_lenght] = '\0';
       tmp_node = memcpy(tmp_node, new_node, sizeof(node));
       new_node = memcpy(new_node, nod, sizeof(node));
       nod = memcpy(nod, tmp_node, sizeof(node));
@@ -300,7 +340,9 @@ void add_word(node *nod, char *new_word) {
       state = INIT_INLINE_WITH_NEW;
       continue;
     case INIT_INLINE_WITH_NEW:
-//       printf("INIT_INLINE_WITH_NEW\n");
+#ifdef DEBUG
+      printf("INIT_INLINE_WITH_NEW\n");
+#endif
       // 3 = 1 per \0 dopo parola, 1 per # e 1 per ultimo \0
       // nel calcolo same_chars si cancella
       nod->str_lenght = nod->node_lenght + 3 + words_lenght - i;
@@ -314,24 +356,29 @@ void add_word(node *nod, char *new_word) {
       state = NOTHING_TO_DO;
       break;
     case CUT_FROM_INLINE:
-//       printf("CUT_FROM_INLINE\n");
-      new_nodeLen = 0;
+#ifdef DEBUG
+      printf("CUT_FROM_INLINE\n");
+#endif
+      new_node_lenght = 0;
+
       // il +1 è per skippare il #
-      while (nod->str[inline_index + new_nodeLen + 1] == new_word[i + new_nodeLen])
-        new_nodeLen++;
-      new_node = init_node(new_word + i, new_nodeLen);
-      new_inlined_lenght = words_lenght - new_nodeLen - i;
+      while (nod->str[inline_index + new_node_lenght + 1] ==
+             new_word[i + new_node_lenght])
+        new_node_lenght++;
+      new_node = init_node(new_word + i, new_node_lenght);
+      new_inlined_lenght = words_lenght - new_node_lenght - i;
 
       new_node->str_lenght = new_node->node_lenght + 3 + new_inlined_lenght;
-      new_node->str = realloc(new_node->str, sizeof(char) * (new_node->str_lenght));
+      new_node->str =
+          realloc(new_node->str, sizeof(char) * (new_node->str_lenght));
+
       memcpy(new_node->str + new_node->node_lenght + 2,
-             nod->str + inline_index + 1 + new_nodeLen,
+             nod->str + inline_index + 1 + new_node_lenght,
              sizeof(char) * (words_lenght - i));
 
       new_node->str[new_node->node_lenght + 1] = '#';
       new_node->str[new_node->str_lenght - 1] = '\0';
       nod->next = realloc(nod->next, sizeof(node) * (nod->connected_nodes + 1));
-
       new_next_index = get_index(*new_node->str, nod->mask);
       if (new_next_index < nod->connected_nodes)
         for (size_t j = nod->connected_nodes; j > new_next_index; j--)
@@ -341,17 +388,17 @@ void add_word(node *nod, char *new_word) {
       nod->next[new_next_index] = new_node;
       SET_BIT(nod->mask, alph[(uint8_t)*new_node->str]);
 
-      new_inlined_lenght += new_nodeLen;
-      for (uint16_t j = inline_index; j < nod->str_lenght - new_inlined_lenght - 1;
-           j += 1 + nod->node_lenght) {
+      new_inlined_lenght += new_node_lenght;
+      for (uint16_t j = inline_index;
+           j < nod->str_lenght - new_inlined_lenght - 1;
+           j += 1 + new_inlined_lenght) {
         memcpy(nod->str + j, nod->str + j + new_inlined_lenght + 1,
                sizeof(char) * (new_inlined_lenght + 1));
       }
-
       nod->str_lenght -= 1 + new_inlined_lenght;
       nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
       nod->str[nod->str_lenght - 1] = '\0';
-      i += new_nodeLen;
+      i += new_node_lenght;
 
       nod = new_node;
       state = ADD_TO_INLINE;
@@ -385,7 +432,8 @@ void __stampa_filtrate(node *nod, size_t depth, char *working_str) {
       }
       if (*(nod->next[i]->str) < *(nod->str + j + 1)) {
         memcpy(tmp + depth, nod->next[i]->str, nod->next[i]->node_lenght);
-        __stampa_filtrate(nod->next[i], depth + nod->next[i]->node_lenght, working_str);
+        __stampa_filtrate(nod->next[i], depth + nod->next[i]->node_lenght,
+                          working_str);
         i++;
       } else {
         memcpy(tmp + depth, nod->str + j + 1, words_lenght - depth);
@@ -399,7 +447,8 @@ void __stampa_filtrate(node *nod, size_t depth, char *working_str) {
       }
 
       memcpy(tmp + depth, nod->next[i]->str, nod->next[i]->node_lenght);
-      __stampa_filtrate(nod->next[i], depth + nod->next[i]->node_lenght, working_str);
+      __stampa_filtrate(nod->next[i], depth + nod->next[i]->node_lenght,
+                        working_str);
       i++;
     } else if ((j + 1 < nod->str_lenght && !(i < nod->connected_nodes))) {
       if (*(nod->str + j) == '|') {
@@ -423,6 +472,13 @@ void stampa_filtrate(node *nod) {
 bool in_tree(node *nod, char *needle) {
   node *tmp = nod;
   for (size_t i = 0; i < words_lenght; i++) {
+    //     printf("%s %d %d\n", tmp->str, tmp->node_lenght, tmp->str_lenght);
+    if (has_inline(tmp)) {
+      //       printf("%c\n", *needle);
+      if (get_inlined_index(tmp, *needle, words_lenght - i) != 0)
+        return true;
+    }
+
     if ((GET_BIT(tmp->mask, alph[(uint8_t)*needle])) == 0) {
       return false;
     }
@@ -529,8 +585,9 @@ void print_tree(node *nod, int depth) {
     printf("%s ", nod->str + nod->node_lenght + 1);
 
   if (nod->connected_nodes != 0)
-    printf("len -> %d strLen = %d connected -> %d\n", nod->node_lenght, nod->str_lenght,
-           nod->connected_nodes);
+    printf("len -> %d strLen = %d connected -> %d deleted -> %hd\n",
+           nod->node_lenght, nod->str_lenght, nod->connected_nodes,
+           nod->deleted);
   else {
     cont++;
     printf("len -> %d %d\n", nod->node_lenght, cont);
@@ -541,8 +598,8 @@ void print_tree(node *nod, int depth) {
 }
 
 void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
-                            char *working_str) {
-  if (nod->deleted == 0 && depth == words_lenght) {
+                            char *working_str, int inline_index) {
+  if ((nod->deleted == 0 || inline_index != -1) && depth == words_lenght) {
     working_str[depth + 1] = '\0';
 
 #ifdef DEBUG
@@ -555,7 +612,10 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
       printf("--------------------------\n");
 #endif
       words_count--;
-      nod->deleted = 1;
+      if (inline_index < 0)
+        nod->deleted = 1;
+      else
+        nod->str[inline_index] = '|';
     }
 #ifdef DEBUG
     else {
@@ -567,29 +627,68 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
   }
 
   size_t deleted_count = 0;
-
-  for (size_t i = 0; i < nod->connected_nodes; i++) {
-    node *next = nod->next[i];
-    deleted_count += next->deleted;
-    if (next->deleted == 1)
-      continue;
-
-    size_t len = next->str_lenght;
+  bool finished = false;
+  size_t i = 0, j = nod->node_lenght + 1;
+  while (!finished) {
     char *tmp = working_str;
-    tmp += depth;
-    memcpy(tmp, next->str, len);
 
-    __remove_incompatibile(filter, next, depth + len, str, working_str);
-  }
-  if (deleted_count == nod->connected_nodes && nod->connected_nodes != 0) {
-    nod->deleted = 1;
+    if (j + 1 < nod->str_lenght && i < nod->connected_nodes) {
+      if (nod->next[i]->deleted > 0) {
+        i++;
+        deleted_count++;
+        continue;
+      }
+      if (*(nod->str + j) == '|') {
+        j += 1 + (words_lenght - depth);
+        deleted_count++;
+        continue;
+      }
+      if (*(nod->next[i]->str) < *(nod->str + j + 1)) {
+        memcpy(tmp + depth, nod->next[i]->str, nod->next[i]->node_lenght);
+        __remove_incompatibile(filter, nod->next[i],
+                               depth + nod->next[i]->node_lenght, str,
+                               working_str, -1);
+        i++;
+      } else {
+        memcpy(tmp + depth, nod->str + j + 1, words_lenght - depth);
+        __remove_incompatibile(filter, nod, words_lenght, str, working_str, j);
+        j += 1 + (words_lenght - depth);
+      }
+    } else if (!(j + 1 < nod->str_lenght) && i < nod->connected_nodes) {
+      if (nod->next[i]->deleted > 0) {
+        i++;
+        deleted_count++;
+        continue;
+      }
+
+      memcpy(tmp + depth, nod->next[i]->str, nod->next[i]->node_lenght);
+      __remove_incompatibile(filter, nod->next[i],
+                             depth + nod->next[i]->node_lenght, str,
+                             working_str, -1);
+
+      i++;
+    } else if ((j + 1 < nod->str_lenght && !(i < nod->connected_nodes))) {
+      if (*(nod->str + j) == '|') {
+        j += 1 + (words_lenght - depth);
+        deleted_count++;
+        continue;
+      }
+      memcpy(tmp + depth, nod->str + j + 1, words_lenght - depth);
+      __remove_incompatibile(filter, nod, words_lenght, str, working_str, j);
+      j += 1 + (words_lenght - depth);
+    } else
+      finished = true;
+
+    nod->deleted = deleted_count == (nod->connected_nodes +
+                                     ((nod->str_lenght - nod->node_lenght - 2) /
+                                      (words_lenght - depth + 1)));
   }
   return;
 }
 
 void remove_incompatibile(char *filter, node *nod, char *str) {
   char *working_str = malloc(sizeof(char) * (words_lenght + 1));
-  __remove_incompatibile(filter, nod, 0, str, working_str);
+  __remove_incompatibile(filter, nod, 0, str, working_str, -1);
   free(working_str);
 }
 
@@ -598,9 +697,18 @@ void reset_deleted_nodes(node *nod) {
   for (size_t i = 0; i < nod->connected_nodes; i++) {
     reset_deleted_nodes(nod->next[i]);
   }
-  if (has_inline(nod)){
-    for (size_t i = nod->node_lenght + 2; i < nod->str_lenght; i++)
-      *nod->str = '#';
+  if (has_inline(nod)) {
+    size_t inline_lenght = 1;
+    for (size_t i = nod->node_lenght + 2;
+         i < nod->str_lenght && *(nod->str + i) != '#' &&
+         *(nod->str + i) != '|';
+         i++)
+      inline_lenght++;
+
+    for (size_t i = nod->node_lenght + 1; i + 1 < nod->str_lenght;
+         i += inline_lenght) {
+      nod->str[i] = '#';
+    }
   }
 }
 
@@ -633,6 +741,8 @@ int main() {
     printf("----%s---------------\n", line);
 #endif
     add_word(words, line);
+    //     if (line[0] == 'r')
+    //         print_tree(words, 0);
     NEW_LINE(line);
   }
 
@@ -752,7 +862,7 @@ int main() {
       has_won = false;
       finished = true;
     }
-
+    //     print_tree(words, 0);
     if (parse_command(line) == INS_INI) {
 #ifdef DEBUG
       printf("---Input------------------\n");
@@ -802,7 +912,8 @@ int main() {
       printf("--------------------------\n");
 #endif
       if (saved_results->len < num_of_guesses) {
-        saved_results->v = realloc(saved_results->v, sizeof(char *) * num_of_guesses);
+        saved_results->v =
+            realloc(saved_results->v, sizeof(char *) * num_of_guesses);
         saved_guesses->v =
             realloc(saved_guesses->v, sizeof(char *) * num_of_guesses);
         for (size_t i = saved_results->len; i < num_of_guesses; i++) {
@@ -817,6 +928,7 @@ int main() {
     }
     NEW_LINE(line);
   }
+
   // TODO Free everything
   return 0;
 }
