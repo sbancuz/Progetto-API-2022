@@ -2,6 +2,6 @@
 
 CFLAGS="-Wall -Wextra -Wshadow -Werror -Werror=unused-result -g3 -std=gnu11 -pedantic -O2"
 clear
-set -xe
 rm cachegrind.out.*
+set -xe
 gcc $OPT $CFLAGS -o $1 $1.c && valgrind --tool=cachegrind ./$1 <<< $(< ./open_testcases/$2.txt)

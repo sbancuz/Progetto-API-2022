@@ -2,6 +2,6 @@
 
 CFLAGS="-Wall -Wextra -Wshadow -Werror -Werror=unused-result -g3 -std=gnu11 -pedantic -O2"
 clear
-set -xe
 rm callgrind.out.*
+set -xe
 gcc $OPT $CFLAGS -o $1 $1.c && valgrind --tool=callgrind ./$1 --dump-instr=yes --collect-jumps=yes <<< $(< ./open_testcases/$2.txt)
