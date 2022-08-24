@@ -1,7 +1,8 @@
-gr*
-ru*
-tes*
-soluzione\n
-vgcore*
-*.txt
 *.out
+*.out.*
+grinded.txt
+soluzione
+vgcore.*
+out.txt
+sandbox.c
+sandbox
