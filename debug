@@ -1,0 +1,5 @@
+#!/bin/sh
+
+CFLAGS="-std=c99 -ggdb -lm -w"
+clear
+gcc $CFLAGS $1.c && gdb --args a.out 5 8adfs 5sjaH KS06l Hi23a laj74 5scas \-s9k0 sm_ks okauE +nuova_partita 5sjaH 3 KS06l had7s okauE 5sjaH

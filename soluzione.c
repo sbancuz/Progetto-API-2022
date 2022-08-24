@@ -140,35 +140,35 @@ void add_word(node *nod, char *new_word) {
         continue;
       }
       if (nod->str[same_chars] == '\0') {
+        same_chars = 0;
 
         if ((GET_BIT(nod->mask, alph[(uint8_t) * (new_word + i)])) == 1) {
-          //           node *parent = nod;
           nod = nod->next[get_index(*(new_word + i), nod->mask)];
-          same_chars = 0;
           if (nod->node_lenght == 1) {
             i--;
             continue;
           }
           while (nod->str[same_chars] == new_word[same_chars + i])
             same_chars++;
-
           i += same_chars;
 
           if (same_chars != nod->node_lenght) {
             // se inline_lenght nuova è diversa dalla vecchia allora faccio
             // in-between
-            if ((words_lenght - i !=
-                       (nod->str_lenght - nod->node_lenght - 2) /
-                           (words_lenght - nod->node_lenght + 1))) {
+            // onestamente non so bene perché funzioni sta cosa, ma
+            // words_lenght - i si semplificava da tutte e due le parti
+            if (same_chars - nod->node_lenght != 0) {
               state = MAKE_INBETWEEN_NODE;
-            } else if ((inline_index = get_inlined_index(nod, *(new_word + i),
-                                                  words_lenght - i)) != 0) {
+              break;
+
+            } else if ((inline_index = get_inlined_index(
+                            nod, *(new_word + i), words_lenght - i)) != 0) {
               state = CUT_FROM_INLINE;
               break;
             } else {
               state = INIT_INLINE;
+              break;
             }
-            break;
           } else {
             state = ADD_TO_INLINE;
             break;
@@ -246,6 +246,7 @@ void add_word(node *nod, char *new_word) {
 #endif
       new_index_in_inline = -1;
       nod->str_lenght += words_lenght - i + 1;
+
       nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
       new_inlined_lenght = words_lenght - i;
 
@@ -282,7 +283,6 @@ void add_word(node *nod, char *new_word) {
 #ifdef DEBUG
       printf("CUT_NODE\n");
 #endif
-
       new_node = init_node(nod->str, same_chars);
       tmp_node = malloc(sizeof(node));
 
@@ -291,8 +291,8 @@ void add_word(node *nod, char *new_word) {
       nod->str = memmove(nod->str, nod->str + same_chars,
                          sizeof(char) * (nod->str_lenght));
       nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
-      nod->str[nod->node_lenght] = '\0';
 
+      nod->str[nod->node_lenght] = '\0';
       tmp_node = memcpy(tmp_node, new_node, sizeof(node));
       new_node = memcpy(new_node, nod, sizeof(node));
       nod = memcpy(nod, tmp_node, sizeof(node));
@@ -322,7 +322,7 @@ void add_word(node *nod, char *new_word) {
       new_node = init_node(nod->str, same_chars);
       tmp_node = malloc(sizeof(node));
       nod->node_lenght -= same_chars;
-      nod->str_lenght  -= same_chars;
+      nod->str_lenght -= same_chars;
 
       nod->str = memmove(nod->str, nod->str + same_chars,
                          sizeof(char) * (nod->str_lenght));
@@ -374,7 +374,7 @@ void add_word(node *nod, char *new_word) {
 
       memcpy(new_node->str + new_node->node_lenght + 2,
              nod->str + inline_index + 1 + new_node_lenght,
-             sizeof(char) * (words_lenght - i));
+             sizeof(char) * (new_inlined_lenght));
 
       new_node->str[new_node->node_lenght + 1] = '#';
       new_node->str[new_node->str_lenght - 1] = '\0';
@@ -389,11 +389,19 @@ void add_word(node *nod, char *new_word) {
       SET_BIT(nod->mask, alph[(uint8_t)*new_node->str]);
 
       new_inlined_lenght += new_node_lenght;
-      for (uint16_t j = inline_index;
-           j < nod->str_lenght - new_inlined_lenght - 1;
-           j += 1 + new_inlined_lenght) {
-        memcpy(nod->str + j, nod->str + j + new_inlined_lenght + 1,
-               sizeof(char) * (new_inlined_lenght + 1));
+      //       printf("%ld %s\n", new_inlined_lenght, nod->str +
+      //       nod->node_lenght + 1); printf("%ld %s\n", inline_index, nod->str
+      //       + inline_index); printf("%ld %s\n", inline_index, nod->str +
+      //       inline_index - new_inlined_lenght);
+      //
+      //       printf("%ld %s\n", new_inlined_lenght, nod->str +
+      //       nod->node_lenght + 1);
+
+      if (inline_index <
+          nod->str_lenght - nod->node_lenght - 2 - new_inlined_lenght) {
+        memmove(nod->str + inline_index,
+                nod->str + inline_index + new_inlined_lenght + 1,
+                sizeof(char) * (nod->str_lenght - inline_index));
       }
       nod->str_lenght -= 1 + new_inlined_lenght;
       nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
@@ -628,12 +636,15 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
 
   size_t deleted_count = 0;
   bool finished = false;
-  size_t i = 0, j = nod->node_lenght + 1;
+  size_t i = 0, j = nod->node_lenght + 1, next_lenght;
+  node *next = nod;
   while (!finished) {
     char *tmp = working_str;
-
+    inline_index = -1;
+    next_lenght = 0;
     if (j + 1 < nod->str_lenght && i < nod->connected_nodes) {
-      if (nod->next[i]->deleted > 0) {
+      next = nod->next[i];
+      if (next->deleted > 0) {
         i++;
         deleted_count++;
         continue;
@@ -643,28 +654,28 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
         deleted_count++;
         continue;
       }
-      if (*(nod->next[i]->str) < *(nod->str + j + 1)) {
-        memcpy(tmp + depth, nod->next[i]->str, nod->next[i]->node_lenght);
-        __remove_incompatibile(filter, nod->next[i],
-                               depth + nod->next[i]->node_lenght, str,
-                               working_str, -1);
+      if (*(next->str) < *(nod->str + j + 1)) {
+        memcpy(tmp + depth, next->str, next->node_lenght);
+        next_lenght = depth + next->node_lenght;
         i++;
       } else {
         memcpy(tmp + depth, nod->str + j + 1, words_lenght - depth);
-        __remove_incompatibile(filter, nod, words_lenght, str, working_str, j);
+        inline_index = j;
+        next_lenght = words_lenght;
+        next = nod;
+
         j += 1 + (words_lenght - depth);
       }
     } else if (!(j + 1 < nod->str_lenght) && i < nod->connected_nodes) {
-      if (nod->next[i]->deleted > 0) {
+      next = nod->next[i];
+      if (next->deleted > 0) {
         i++;
         deleted_count++;
         continue;
       }
 
-      memcpy(tmp + depth, nod->next[i]->str, nod->next[i]->node_lenght);
-      __remove_incompatibile(filter, nod->next[i],
-                             depth + nod->next[i]->node_lenght, str,
-                             working_str, -1);
+      memcpy(tmp + depth, next->str, next->node_lenght);
+      next_lenght = depth + next->node_lenght;
 
       i++;
     } else if ((j + 1 < nod->str_lenght && !(i < nod->connected_nodes))) {
@@ -674,10 +685,22 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
         continue;
       }
       memcpy(tmp + depth, nod->str + j + 1, words_lenght - depth);
-      __remove_incompatibile(filter, nod, words_lenght, str, working_str, j);
+      inline_index = j;
+      next_lenght = words_lenght;
+      next = nod;
+
       j += 1 + (words_lenght - depth);
-    } else
+    } else {
       finished = true;
+      nod->deleted =
+          deleted_count ==
+          (nod->connected_nodes + ((nod->str_lenght - nod->node_lenght - 2) /
+                                   (words_lenght - depth + 1)));
+      return;
+    }
+
+    __remove_incompatibile(filter, next, next_lenght, str, working_str,
+                           inline_index);
 
     nod->deleted = deleted_count == (nod->connected_nodes +
                                      ((nod->str_lenght - nod->node_lenght - 2) /

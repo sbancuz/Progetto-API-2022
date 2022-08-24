@@ -1,0 +1,7 @@
+#!/bin/sh
+
+CFLAGS="-Wall -Wextra -Wshadow -Werror -Werror=unused-result -g3 -std=gnu11 -pedantic -O2"
+clear
+rm ./massif.*
+rm ./grinded.txt.core*
+gcc $CFLAGS -o $1 $1.c && valgrind --tool=massif --log-file="./grinded.txt" ./$1 <<< $(< ./open_testcases/$2.txt) && ms_print ./massif.*
