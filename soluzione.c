@@ -18,9 +18,6 @@
   input_string_lenght = getline(&a, &len, stdin);                              \
   a[input_string_lenght - 1] = '\0'
 
-#define SET_BIT(m, i) m = ((uint64_t)1 << i) | m
-#define GET_BIT(m, i) (m >> i) & 1
-
 typedef struct node_s {
   char *str;
   uint16_t str_lenght;
@@ -55,6 +52,8 @@ size_t words_count = 0;
 
 uint16_t *no;
 uint16_t *co;
+uint16_t *ns;
+uint16_t *cs;
 uint16_t *sc;
 
 void *init_node(char *c, uint32_t len) {
@@ -483,7 +482,6 @@ void compute_res(char *r, char *p, char *res) {
 }
 
 bool compatible(char *filter, char *r, char *p) {
-  size_t n = 0, c = 0, s = 0;
   bool is_same_str = true;
   for (size_t i = 0; filter[i] != '\0'; ++i) {
     if (p[i] != r[i])
@@ -496,30 +494,14 @@ bool compatible(char *filter, char *r, char *p) {
         continue;
     }
 
-    n = 0;
-    c = 0;
-    s = 0;
-    for (size_t j = 0; filter[j] != '\0'; ++j) {
-      if (j < i && p[j] == p[i] && p[j] != r[j])
-        s++;
-      if (p[i] == r[j]) {
-        if (p[j] == r[j])
-          c++;
-        n++;
-      }
-    }
-
-#ifdef DEBUG
-    printf(" %c - n = %ld, c = %ld, s = %ld\n", p[i], n, c, s);
-#endif
     if (filter[i] == '|') {
-      if ((r[i] == p[i] || n == 0 || s >= n - c))
+      if ((r[i] == p[i] || no[(uint8_t)p[i]] == 0 || sc[i] >= no[(uint8_t)p[i]] - co[(uint8_t)p[i]]))
         return false;
       else
         continue;
     }
 
-    if (filter[i] == '/' && (s < n - c || (n != 0 && r[i] == p[i])))
+    if (filter[i] == '/' && (sc[i] < no[(uint8_t)p[i]] - co[(uint8_t)p[i]] || (no[(uint8_t)p[i]] != 0 && r[i] == p[i])))
       return false;
   }
 
@@ -556,6 +538,7 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
     printf("----compatibility test----\n");
     printf("%s - %s - %s\n", filter, working_str, str);
 #endif
+
     if (!compatible(filter, working_str, str)) {
 #ifdef DEBUG
       printf("incompatibile\n");
@@ -584,6 +567,7 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
     char *tmp = working_str;
     inline_index = -1;
     next_lenght = 0;
+    // get next working string
     if (j + 1 < nod->str_lenght && i < nod->connected_nodes) {
       next = nod->next[i];
       if (next->deleted > 0) {
@@ -641,8 +625,27 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
       return;
     }
 
+    // setup counters for compatibility check
+    for (size_t d = depth; d < next_lenght; d++) {
+      sc[d] = ns[(uint8_t)str[d]] - co[(uint8_t)str[d]];
+      no[(uint8_t)working_str[d]]++;
+      ns[(uint8_t)str[d]]++;
+      if (str[d] == working_str[d])
+        co[(uint8_t)working_str[d]]++;
+    }
+
     __remove_incompatibile(filter, next, next_lenght, str, working_str,
                            inline_index);
+
+    // undo this step counters
+    for (size_t d = depth; d < next_lenght; d++) {
+      no[(uint8_t)working_str[d]]--;
+      ns[(uint8_t)str[d]]--;
+
+      if (str[d] == working_str[d])
+        co[(uint8_t)working_str[d]]--;
+      sc[d] = 0;
+    }
 
     nod->deleted = deleted_count == (nod->connected_nodes +
                                      ((nod->str_lenght - nod->node_lenght - 2) /
@@ -679,20 +682,16 @@ void reset_deleted_nodes(node *nod) {
 
 int main() {
   char *line;
-  no = malloc(sizeof(uint16_t) * ALPHALEN);
-  co = malloc(sizeof(uint16_t) * ALPHALEN);
-  sc = malloc(sizeof(uint16_t) * words_lenght);
+  no = calloc(UINT8_MAX, sizeof(uint16_t));
+  co = calloc(UINT8_MAX, sizeof(uint16_t));
+  ns = calloc(UINT8_MAX, sizeof(uint16_t));
+  cs = calloc(UINT8_MAX, sizeof(uint16_t));
+  sc = calloc(words_lenght, sizeof(uint16_t));
   INIT_LINE_BUFFER();
   NEW_LINE(line);
 
   words_lenght = strtol(line, NULL, 10);
   node *words = init_node("#", 1);
-  for (size_t i = 0; i < ALPHALEN; i++) {
-    no[i] = 0;
-    co[i] = 0;
-    if (i < words_lenght)
-      sc[i] = 0;
-  }
   line = malloc(sizeof(char) * words_lenght);
   NEW_LINE(line);
 #ifdef DEBUG
@@ -893,7 +892,6 @@ int main() {
     }
     NEW_LINE(line);
   }
-
   // TODO Free everything
   return 0;
 }
