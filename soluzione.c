@@ -559,7 +559,7 @@ void delete_tree(node *nod) {
     delete_tree(nod->next[i]);
 }
 
-void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
+size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
                             char *working_str, int inline_index) {
   if ((nod->deleted == 0 || inline_index != -1) && depth == words_lenght) {
     working_str[depth] = '\0';
@@ -579,6 +579,7 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
         nod->deleted = 1;
       else
         nod->str[inline_index] = '|';
+      return 1;
     }
 #ifdef DEBUG
     else {
@@ -586,25 +587,25 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
       printf("--------------------------\n");
     }
 #endif
-    return;
+    return 0;
   }
 
-  //   if (nod->str[0] != '#') {
-  //     // preemptive check to skip a lot of stuff
-  // //     printf("-->%ld\n", depth - 1);
-  //     for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
-  //     d++, l++) {
-  //       if ((filter[d] == '+' && nod->str[l] != str[d]) ||
-  //           (filter[d] == '|' && nod->str[l] == str[d])) {
-  //         // set everything to deleted
-  // //                 printf("%s %s %s %ld\n", str, filter, nod->str, d);
-  // //                 printf("%c %c %c\n", nod->str[l], str[d], filter[d]);
-  // //                 printf("-->%s\n", nod->str);
-  //         delete_tree(nod);
-  //         return;
-  //       }
-  //     }
-  //   }
+//     if (nod->str[0] != '#') {
+//       // preemptive check to skip a lot of stuff
+//   //     printf("-->%ld\n", depth - 1);
+//       for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
+//       d++, l++) {
+//         if ((filter[d] == '+' && nod->str[l] != str[d])/* ||
+//             (filter[d] == '|' && nod->str[l] == str[d])*/) {
+//           // set everything to deleted
+//         printf("-------------------------\n");
+//         print_tree(nod, 0);
+//
+//           delete_tree(nod);
+//           return;
+//         }
+//       }
+//     }
   size_t deleted_count = 0;
   bool finished = false;
   size_t i = 0, j = nod->node_lenght + 1, next_lenght;
@@ -669,7 +670,7 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
           deleted_count ==
           (nod->connected_nodes + ((nod->str_lenght - nod->node_lenght - 2) /
                                    (words_lenght - depth + 1)));
-      return;
+      return nod->deleted;
     }
 
     //     printf("-------------------\n");
@@ -687,7 +688,7 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
         co[(uint8_t)working_str[d]]++;
     }
 
-    __remove_incompatibile(filter, next, next_lenght, str, working_str,
+    deleted_count += __remove_incompatibile(filter, next, next_lenght, str, working_str,
                            inline_index);
 
     // undo this step counters
@@ -704,7 +705,7 @@ void __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
                                      ((nod->str_lenght - nod->node_lenght - 2) /
                                       (words_lenght - depth + 1)));
   }
-  return;
+  return nod->deleted;
 }
 
 void remove_incompatibile(char *filter, node *nod, char *str) {
@@ -871,6 +872,9 @@ int main() {
       strcpy(saved_results->v[saved_results->len - 1], res);
       saved_guesses->len++;
       strcpy(saved_guesses->v[saved_guesses->len - 1], line);
+
+//       printf("----------------------------------\n");
+//       print_tree(words, 0);
 
       remove_incompatibile(res, words, line);
 
