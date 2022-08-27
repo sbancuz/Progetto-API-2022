@@ -353,6 +353,9 @@ void add_word(node *nod, char *new_word) {
       }
     }
   }
+
+  // in case of some bug too annoying to catch
+  nod->str[nod->str_lenght - 1] = '\0';
   nod = tmp;
   words_count++;
 }
@@ -417,14 +420,29 @@ void stampa_filtrate(node *nod) {
   free(working_str);
 }
 
+
 bool in_tree(node *nod, char *needle) {
   node *tmp = nod;
+  size_t inline_index = 0;
   for (size_t i = 0; i < words_lenght; i++) {
     //     printf("%s %d %d\n", tmp->str, tmp->node_lenght, tmp->str_lenght);
     if (has_inline(tmp)) {
       //       printf("%c\n", *needle);
-      if (get_inlined_index(tmp, *needle, words_lenght - i) != 0)
-        return true;
+      if ((inline_index = get_inlined_index(tmp, *needle, words_lenght - i)) !=
+          0) {
+        bool same = true;
+        for (size_t j = inline_index + 1;
+             j < tmp->str_lenght && *(tmp->str + j) != '#' &&
+             *(tmp->str + j) != '|';
+             j++) {
+          if (tmp->str[j] != needle[j - inline_index - 1]) {
+            same = false;
+            break;
+          }
+        }
+        if (same){
+          return true;}
+      }
     }
 
     if (!has_char(tmp, *needle)) {
@@ -442,7 +460,6 @@ bool in_tree(node *nod, char *needle) {
   }
   return true;
 }
-
 size_t count(char *str, char needle) {
   size_t cont = 0;
 
@@ -590,22 +607,20 @@ size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
     return 0;
   }
 
-//     if (nod->str[0] != '#') {
-//       // preemptive check to skip a lot of stuff
-//   //     printf("-->%ld\n", depth - 1);
-//       for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
-//       d++, l++) {
-//         if ((filter[d] == '+' && nod->str[l] != str[d])/* ||
-//             (filter[d] == '|' && nod->str[l] == str[d])*/) {
-//           // set everything to deleted
-//         printf("-------------------------\n");
-//         print_tree(nod, 0);
-//
-//           delete_tree(nod);
-//           return;
-//         }
-//       }
-//     }
+    if (nod->str[0] != '#') {
+      // preemptive check to skip a lot of stuff
+  //     printf("-->%ld\n", depth - 1);
+      for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
+      d++, l++) {
+        if ((filter[d] == '+' && nod->str[l] != str[d]) ||
+            (filter[d] == '|' && nod->str[l] == str[d])) {
+          // set everything to deleted
+
+          delete_tree(nod);
+          return 1;
+        }
+      }
+    }
   size_t deleted_count = 0;
   bool finished = false;
   size_t i = 0, j = nod->node_lenght + 1, next_lenght;
@@ -857,7 +872,7 @@ int main() {
       } else if (!in_tree(words, line)) {
 #ifdef DEBUG
         printf("---------------------------\n");
-        printf("%s\n", line);
+        printf("-->%s\n", line);
 #endif
         printf("not_exists\n");
 #ifdef DEBUG
