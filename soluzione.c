@@ -273,7 +273,6 @@ void cut_from_inline(node *nod, char *new_word, size_t inline_index, size_t i) {
   nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
   nod->str[nod->str_lenght - 1] = '\0';
   i += new_node_lenght;
-
   nod = new_node;
 
   add_to_inline(nod, new_word, i);
@@ -289,8 +288,7 @@ void add_word(node *nod, char *new_word) {
   } else {
     nod = nod->next[get_index(nod, *new_word)];
     for (i = 0; i < words_lenght; i++) {
-      if (nod->deleted == 1)
-        nod->deleted = 0;
+      nod->deleted = 0;
 
       if (nod->str[same_chars] == new_word[i]) {
         same_chars++;
@@ -300,6 +298,7 @@ void add_word(node *nod, char *new_word) {
         same_chars = 0;
         if (has_char(nod, new_word[i])) {
           nod = nod->next[get_index(nod, *(new_word + i))];
+          nod->deleted = 0;
           if (nod->node_lenght == 1) {
             i--;
             continue;
@@ -355,7 +354,7 @@ void add_word(node *nod, char *new_word) {
           init_inline(nod, new_word, same_chars, i);
           break;
         } else {
-          cut_node(nod, new_word, same_chars, i);
+          make_inbetween_node(nod, new_word, same_chars, i);
           break;
         }
       }
@@ -367,11 +366,12 @@ void add_word(node *nod, char *new_word) {
   nod = tmp;
   words_count++;
 }
-
+size_t conta = 0;
 void __stampa_filtrate(node *nod, size_t depth, char *working_str) {
   if (nod->deleted == 0 && depth == words_lenght) {
     working_str[words_lenght] = '\0';
     printf("%s\n", working_str);
+    conta++;
     return;
   }
 
@@ -424,6 +424,7 @@ void __stampa_filtrate(node *nod, size_t depth, char *working_str) {
 
 void stampa_filtrate(node *nod) {
   char *working_str = malloc(sizeof(char) * (words_lenght + 1));
+  conta = 0;
   __stampa_filtrate(nod, 0, working_str);
   free(working_str);
 }
@@ -543,13 +544,13 @@ void print_tree(node *nod, int depth) {
     printf("%s ", nod->str + nod->node_lenght + 1);
 
   if (nod->connected_nodes != 0)
-    printf("len -> %d strLen = %d connected -> %d deleted -> %hd\n",
+    printf("len -> %d strLen = %d connected -> %d deleted -> %hd \n",
            nod->node_lenght, nod->str_lenght, nod->connected_nodes,
            nod->deleted);
   else {
     cont++;
-    printf("len -> %d deleted -> %hd %d\n", nod->node_lenght, nod->deleted,
-           cont);
+    printf("len -> %d deleted -> %hd %d strlen = %d depth = %d\n",
+           nod->node_lenght, nod->deleted, cont, nod->str_lenght, depth);
   }
 
   for (uint32_t i = 0; i < nod->connected_nodes; i++)
@@ -584,6 +585,35 @@ void delete_tree(node *nod) {
     delete_tree(nod->next[i]);
 }
 
+size_t cont_tree(node *nod) {
+  if (nod->deleted == 1)
+    return 0;
+
+  size_t cont = 0;
+  if (has_inline(nod)) {
+    size_t inline_lenght = 1;
+    for (size_t i = nod->node_lenght + 2;
+         i < nod->str_lenght && *(nod->str + i) != '#' &&
+         *(nod->str + i) != '|';
+         i++)
+      inline_lenght++;
+
+    for (size_t i = nod->node_lenght + 1; i < nod->str_lenght;
+         i += inline_lenght) {
+      if (nod->str[i] == '#') {
+        cont++;
+      }
+    }
+  } else if (nod->connected_nodes == 0) {
+    return cont + 1;
+  }
+
+  for (uint32_t i = 0; i < nod->connected_nodes; i++)
+    cont += cont_tree(nod->next[i]);
+
+  return cont;
+}
+
 size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
                               char *working_str, int inline_index) {
   if ((nod->deleted == 0 || inline_index != -1) && depth == words_lenght) {
@@ -600,10 +630,11 @@ size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
       printf("--------------------------\n");
 #endif
       words_count--;
-      if (inline_index < 0)
+      if (inline_index < 0) {
         nod->deleted = 1;
-      else
+      } else
         nod->str[inline_index] = '|';
+
       return 1;
     }
 #ifdef DEBUG
@@ -633,6 +664,7 @@ size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
   bool finished = false;
   size_t i = 0, j = nod->node_lenght + 1, next_lenght;
   node *next = nod;
+
   while (!finished) {
     char *tmp = working_str;
     inline_index = -1;
@@ -689,11 +721,7 @@ size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
       j += 1 + (words_lenght - depth);
     } else {
       finished = true;
-      nod->deleted =
-          deleted_count ==
-          (nod->connected_nodes + ((nod->str_lenght - nod->node_lenght - 2) /
-                                   (words_lenght - depth + 1)));
-      return nod->deleted;
+      break;
     }
 
     //     printf("-------------------\n");
@@ -723,11 +751,12 @@ size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
         co[(uint8_t)working_str[d]]--;
       sc[d] = 0;
     }
-
-    nod->deleted = deleted_count == (nod->connected_nodes +
-                                     ((nod->str_lenght - nod->node_lenght - 2) /
-                                      (words_lenght - depth + 1)));
   }
+
+  nod->deleted =
+      deleted_count ==
+      (nod->connected_nodes +
+       ((nod->str_lenght - nod->node_lenght - 2) / (words_lenght - depth + 1)));
   return nod->deleted;
 }
 
@@ -908,11 +937,6 @@ int main() {
 
 #ifdef DEBUG
 #endif
-      //             if (words_count == 2){
-      // //               stampa_filtrate(words);
-      //               print_tree(words, 0);
-      // //               exit(1);
-      //             }
       printf("%s\n%ld\n", res, words_count);
       num_of_guesses--;
       NEW_LINE(line);
@@ -988,6 +1012,7 @@ int main() {
     }
     NEW_LINE(line);
   }
+  //   print_tree(words, 0);
   // TODO Free everything
   return 0;
 }
