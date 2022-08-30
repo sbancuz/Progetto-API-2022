@@ -264,7 +264,7 @@ void cut_from_inline(node *nod, char *new_word, size_t inline_index, size_t i) {
 
   new_inlined_lenght += new_node_lenght;
 
-  if (inline_index < nod->str_lenght - nod->node_lenght - new_inlined_lenght) {
+  if (inline_index < nod->str_lenght - new_inlined_lenght) {
     memmove(nod->str + inline_index,
             nod->str + inline_index + new_inlined_lenght + 1,
             sizeof(char) * (nod->str_lenght - inline_index));
