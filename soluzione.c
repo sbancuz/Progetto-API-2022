@@ -147,7 +147,7 @@ void init_inline(node *nod, char *new_word, size_t same_chars, size_t i) {
   // nel calcolo same_chars si cancella
   nod->str_lenght = nod->node_lenght + 3;
   nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
-  memcpy(nod->str + same_chars + 2, nod->str + same_chars,
+  memmove(nod->str + same_chars + 2, nod->str + same_chars,
          sizeof(char) * (nod->node_lenght - same_chars));
 
   nod->node_lenght = same_chars;
@@ -170,7 +170,7 @@ void init_inline_with_new(node *nod, char *new_word, size_t i) {
          sizeof(char) * (words_lenght - i));
 
   nod->str[nod->node_lenght + 1] = '#';
-  nod->str[nod->str_lenght] = '\0';
+  nod->str[nod->str_lenght - 1] = '\0';
 }
 
 void cut_node(node *nod, char *new_word, size_t same_chars, size_t i) {
@@ -267,7 +267,7 @@ void cut_from_inline(node *nod, char *new_word, size_t inline_index, size_t i) {
   if (inline_index < nod->str_lenght - new_inlined_lenght) {
     memmove(nod->str + inline_index,
             nod->str + inline_index + new_inlined_lenght + 1,
-            sizeof(char) * (nod->str_lenght - inline_index));
+            sizeof(char) * (nod->str_lenght - inline_index - new_inlined_lenght - 1));
   }
   nod->str_lenght -= 1 + new_inlined_lenght;
   nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
