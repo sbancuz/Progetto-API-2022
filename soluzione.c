@@ -148,7 +148,7 @@ void init_inline(node *nod, char *new_word, size_t same_chars, size_t i) {
   nod->str_lenght = nod->node_lenght + 3;
   nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
   memmove(nod->str + same_chars + 2, nod->str + same_chars,
-         sizeof(char) * (nod->node_lenght - same_chars));
+          sizeof(char) * (nod->node_lenght - same_chars));
 
   nod->node_lenght = same_chars;
   nod->str[same_chars + 1] = '#';
@@ -267,7 +267,8 @@ void cut_from_inline(node *nod, char *new_word, size_t inline_index, size_t i) {
   if (inline_index < nod->str_lenght - new_inlined_lenght) {
     memmove(nod->str + inline_index,
             nod->str + inline_index + new_inlined_lenght + 1,
-            sizeof(char) * (nod->str_lenght - inline_index - new_inlined_lenght - 1));
+            sizeof(char) *
+                (nod->str_lenght - inline_index - new_inlined_lenght - 1));
   }
   nod->str_lenght -= 1 + new_inlined_lenght;
   nod->str = realloc(nod->str, sizeof(char) * (nod->str_lenght));
@@ -520,8 +521,7 @@ bool compatible(char *filter, char *r, char *p) {
     }
 
     if (filter[i] == '|') {
-      if ((r[i] == p[i] || no[(uint8_t)p[i]] == 0 ||
-           sc[i] >= no[(uint8_t)p[i]] - co[(uint8_t)p[i]]))
+      if ((r[i] == p[i] || sc[i] >= no[(uint8_t)p[i]] - co[(uint8_t)p[i]]))
         return false;
       else
         continue;
@@ -614,8 +614,8 @@ size_t cont_tree(node *nod) {
   return cont;
 }
 
-size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
-                              char *working_str, int inline_index) {
+size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
+                              char *str, char *working_str, int inline_index) {
   if ((nod->deleted == 0 || inline_index != -1) && depth == words_lenght) {
     working_str[depth] = '\0';
 
@@ -649,16 +649,27 @@ size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
   if (nod->str[0] != '#') {
     // preemptive check to skip a lot of stuff
     //     printf("-->%ld\n", depth - 1);
+    bool nuke = true;
     for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
          d++, l++) {
+      if (filter[d] != '+' )
+        nuke = false;
       if ((filter[d] == '+' && nod->str[l] != str[d]) ||
-          (filter[d] == '|' && nod->str[l] == str[d])) {
+          (filter[d] == '|' && (nod->str[l] == str[d])) ||
+          (filter[d] == '/' &&
+           (sc[d] < no[(uint8_t)str[d]] - co[(uint8_t)str[d]] ||
+            (no[(uint8_t)str[d]] != 0 && nod->str[l] == str[d])))) {
         // set everything to deleted
-
         delete_tree(nod);
         return 1;
       }
     }
+    if (nuke)
+      // set everything else to deleted
+      for (size_t l = 0; l < par->connected_nodes; l++) {
+        if (par->next[l]->str[0] != nod->str[0])
+          delete_tree(par->next[l]);
+      }
   }
   size_t deleted_count = 0;
   bool finished = false;
@@ -739,7 +750,7 @@ size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
         co[(uint8_t)working_str[d]]++;
     }
 
-    deleted_count += __remove_incompatibile(filter, next, next_lenght, str,
+    deleted_count += __remove_incompatibile(filter, next, nod, next_lenght, str,
                                             working_str, inline_index);
 
     // undo this step counters
@@ -762,7 +773,7 @@ size_t __remove_incompatibile(char *filter, node *nod, size_t depth, char *str,
 
 void remove_incompatibile(char *filter, node *nod, char *str) {
   char *working_str = malloc(sizeof(char) * (words_lenght + 1));
-  __remove_incompatibile(filter, nod, 0, str, working_str, -1);
+  __remove_incompatibile(filter, nod, NULL, 0, str, working_str, -1);
   free(working_str);
 }
 
