@@ -212,6 +212,7 @@ void make_inbetween_node(node *nod, char *new_word, size_t same_chars,
   printf("MAKE_INBETWEEN_NODE\n");
 #endif
   node *new_node = init_node(nod->str, same_chars);
+  new_node->deleted = nod->deleted;
   node *tmp_node = malloc(sizeof(node));
   nod->node_lenght -= same_chars;
   nod->str_lenght -= same_chars;
@@ -227,7 +228,8 @@ void make_inbetween_node(node *nod, char *new_word, size_t same_chars,
   nod->next[0] = new_node;
   nod->connected_nodes++;
   free(tmp_node);
-
+  // abc #dsadascxzc
+  //  ddef #dasdasda
   init_inline_with_new(nod, new_word, i);
 }
 
@@ -289,8 +291,6 @@ void add_word(node *nod, char *new_word) {
   } else {
     nod = nod->next[get_index(nod, *new_word)];
     for (i = 0; i < words_lenght; i++) {
-      nod->deleted = 0;
-
       if (nod->node_lenght > same_chars &&
           nod->str[same_chars] == new_word[i]) {
         same_chars++;
@@ -312,8 +312,6 @@ void add_word(node *nod, char *new_word) {
             i--;
             continue;
           }
-          nod->deleted = 0;
-
 
           if (same_chars != nod->node_lenght) {
             // se inline_lenght nuova è diversa dalla vecchia allora faccio
@@ -648,7 +646,6 @@ size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
 
   if (nod->str[0] != '#') {
     // preemptive check to skip a lot of stuff
-    //     printf("-->%ld\n", depth - 1);
     bool delete_all_other_nodes = true;
     for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
          d++, l++) {
@@ -797,6 +794,45 @@ void reset_deleted_nodes(node *nod) {
   }
 }
 
+void reset_deleted_word(node *nod, char *needle) {
+  node *tmp = nod;
+  size_t inline_index = 0;
+  for (size_t i = 0; i < words_lenght; i++) {
+    if (has_inline(tmp)) {
+      if ((inline_index = get_inlined_index(tmp, *needle, words_lenght - i)) !=
+          0) {
+        bool same = true;
+        for (size_t j = inline_index + 1;
+             j < tmp->str_lenght && *(tmp->str + j) != '#' &&
+             *(tmp->str + j) != '|';
+             j++) {
+          if (tmp->str[j] != needle[j - inline_index - 1]) {
+            same = false;
+            break;
+          }
+        }
+        if (same) {
+          tmp->deleted = 0;
+          *(tmp->str + inline_index) = '#';
+          return;
+        }
+      }
+    }
+
+    tmp = tmp->next[get_index(tmp, *needle)];
+    tmp->deleted = 0;
+    size_t len = tmp->node_lenght;
+    for (size_t j = 0; j < len; j++) {
+      if (needle[j] != tmp->str[j]) {
+        return;
+      }
+    }
+    needle += len;
+    i += len - 1;
+  }
+  return;
+}
+
 int main() {
   char *line;
   no = calloc(UINT8_MAX, sizeof(uint16_t));
@@ -895,9 +931,12 @@ int main() {
           printf("%s\n", line);
 #endif
           add_word(words, line);
+          reset_deleted_word(words, line);
           words_count_bkp++;
           NEW_LINE(line);
         }
+        stampa_filtrate(words);
+        print_tree(words, 0);
 #ifdef DEBUG
         printf("---------------------------\n");
         stampa_filtrate(words);
