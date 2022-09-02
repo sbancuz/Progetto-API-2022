@@ -291,7 +291,8 @@ void add_word(node *nod, char *new_word) {
     for (i = 0; i < words_lenght; i++) {
       nod->deleted = 0;
 
-      if (nod->str[same_chars] == new_word[i]) {
+      if (nod->node_lenght > same_chars &&
+          nod->str[same_chars] == new_word[i]) {
         same_chars++;
         continue;
       }
@@ -299,7 +300,6 @@ void add_word(node *nod, char *new_word) {
         same_chars = 0;
         if (has_char(nod, new_word[i])) {
           nod = nod->next[get_index(nod, *(new_word + i))];
-          nod->deleted = 0;
           if (nod->node_lenght == 1) {
             i--;
             continue;
@@ -312,6 +312,8 @@ void add_word(node *nod, char *new_word) {
             i--;
             continue;
           }
+          nod->deleted = 0;
+
 
           if (same_chars != nod->node_lenght) {
             // se inline_lenght nuova è diversa dalla vecchia allora faccio
@@ -367,12 +369,11 @@ void add_word(node *nod, char *new_word) {
   nod = tmp;
   words_count++;
 }
-size_t conta = 0;
+
 void __stampa_filtrate(node *nod, size_t depth, char *working_str) {
   if (nod->deleted == 0 && depth == words_lenght) {
     working_str[words_lenght] = '\0';
     printf("%s\n", working_str);
-    conta++;
     return;
   }
 
@@ -425,7 +426,6 @@ void __stampa_filtrate(node *nod, size_t depth, char *working_str) {
 
 void stampa_filtrate(node *nod) {
   char *working_str = malloc(sizeof(char) * (words_lenght + 1));
-  conta = 0;
   __stampa_filtrate(nod, 0, working_str);
   free(working_str);
 }
@@ -649,11 +649,11 @@ size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
   if (nod->str[0] != '#') {
     // preemptive check to skip a lot of stuff
     //     printf("-->%ld\n", depth - 1);
-    bool nuke = true;
+    bool delete_all_other_nodes = true;
     for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
          d++, l++) {
-      if (filter[d] != '+' )
-        nuke = false;
+      if (filter[d] != '+')
+        delete_all_other_nodes = false;
       if ((filter[d] == '+' && nod->str[l] != str[d]) ||
           (filter[d] == '|' && (nod->str[l] == str[d])) ||
           (filter[d] == '/' &&
@@ -664,7 +664,7 @@ size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
         return 1;
       }
     }
-    if (nuke)
+    if (delete_all_other_nodes)
       // set everything else to deleted
       for (size_t l = 0; l < par->connected_nodes; l++) {
         if (par->next[l]->str[0] != nod->str[0])
