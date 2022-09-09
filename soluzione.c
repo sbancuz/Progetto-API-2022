@@ -62,7 +62,7 @@ void *init_node(char *c, uint32_t len) {
   n->str[len] = '\0';
   n->str_lenght = len + 1;
   n->node_lenght = len;
-  n->next = malloc(sizeof(node));
+  n->next = malloc(sizeof(node*));
   return (void *)n;
 }
 
@@ -646,6 +646,7 @@ size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
 
   if (nod->str[0] != '#') {
     // preemptive check to skip a lot of stuff
+    //     printf("-->%ld\n", depth - 1);
     bool delete_all_other_nodes = true;
     for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
          d++, l++) {
@@ -935,8 +936,6 @@ int main() {
           words_count_bkp++;
           NEW_LINE(line);
         }
-        stampa_filtrate(words);
-        print_tree(words, 0);
 #ifdef DEBUG
         printf("---------------------------\n");
         stampa_filtrate(words);
