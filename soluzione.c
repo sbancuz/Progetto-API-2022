@@ -15,8 +15,12 @@
   ssize_t input_string_lenght = 0
 
 #define NEW_LINE(a)                                                            \
-  input_string_lenght = getline(&a, &len, stdin);                              \
-  a[input_string_lenght - 1] = '\0'
+  input_string_lenght = getline(&line, &len, stdin);                           \
+  if (!is_end_of_file()) {                                                     \
+    line[input_string_lenght - 1] = '\0';                                      \
+  }
+
+#define is_end_of_file() (input_string_lenght == -1)
 
 typedef struct node_s {
   char *str;
@@ -50,10 +54,10 @@ enum command parse_command(char *comm) {
 size_t words_lenght;
 size_t words_count = 0;
 
-uint16_t *no;
-uint16_t *co;
-uint16_t *ns;
-uint16_t *sc;
+static uint16_t *no;
+static uint16_t *co;
+static uint16_t *ns;
+static uint16_t *sc;
 
 void *init_node(char *c, uint32_t len) {
   node *n = calloc(1, sizeof(node));
@@ -62,7 +66,7 @@ void *init_node(char *c, uint32_t len) {
   n->str[len] = '\0';
   n->str_lenght = len + 1;
   n->node_lenght = len;
-  n->next = malloc(sizeof(node*));
+  n->next = malloc(sizeof(node *));
   return (void *)n;
 }
 
@@ -108,6 +112,9 @@ void new_node_from_root(node *nod, char *new_word) {
 }
 
 void add_to_inline(node *nod, char *new_word, size_t i) {
+#ifdef DEBUG
+  printf("ADD_TO_INLINE\n");
+#endif
   uint16_t new_index_in_inline = -1;
   nod->str_lenght += words_lenght - i + 1;
 
@@ -126,10 +133,10 @@ void add_to_inline(node *nod, char *new_word, size_t i) {
   if (new_index_in_inline == (uint16_t)-1)
     new_index_in_inline = nod->str_lenght - new_inlined_lenght - 2;
 
-  memcpy(nod->str + new_index_in_inline + new_inlined_lenght + 1,
-         nod->str + new_index_in_inline,
-         sizeof(char) *
-             (nod->str_lenght - new_index_in_inline - new_inlined_lenght - 1));
+  memmove(nod->str + new_index_in_inline + new_inlined_lenght + 1,
+          nod->str + new_index_in_inline,
+          sizeof(char) *
+              (nod->str_lenght - new_index_in_inline - new_inlined_lenght - 1));
   nod->str[new_index_in_inline] = '#';
 
   memcpy(nod->str + new_index_in_inline + 1, new_word + i,
@@ -228,8 +235,7 @@ void make_inbetween_node(node *nod, char *new_word, size_t same_chars,
   nod->next[0] = new_node;
   nod->connected_nodes++;
   free(tmp_node);
-  // abc #dsadascxzc
-  //  ddef #dasdasda
+
   init_inline_with_new(nod, new_word, i);
 }
 
@@ -279,6 +285,28 @@ void cut_from_inline(node *nod, char *new_word, size_t inline_index, size_t i) {
   nod = new_node;
 
   add_to_inline(nod, new_word, i);
+}
+
+void print_tree(node *nod, int depth) {
+  int cont = 0;
+  if (nod->str[0] == '#')
+    cont = 0;
+  printf("%*s%s ", depth, "", nod->str);
+  if (nod->node_lenght != nod->str_lenght)
+    printf("%s ", nod->str + nod->node_lenght + 1);
+
+  if (nod->connected_nodes != 0)
+    printf("len -> %d strLen = %d connected -> %d deleted -> %hd \n",
+           nod->node_lenght, nod->str_lenght, nod->connected_nodes,
+           nod->deleted);
+  else {
+    cont++;
+    printf("len -> %d deleted -> %hd %d strlen = %d depth = %d\n",
+           nod->node_lenght, nod->deleted, cont, nod->str_lenght, depth);
+  }
+
+  for (uint32_t i = 0; i < nod->connected_nodes; i++)
+    print_tree(nod->next[i], depth + nod->node_lenght);
 }
 
 #define has_inline(x) (x->node_lenght + 1 != x->str_lenght)
@@ -366,6 +394,11 @@ void add_word(node *nod, char *new_word) {
   nod->str[nod->str_lenght - 1] = '\0';
   nod = tmp;
   words_count++;
+#ifdef DEBUG
+  printf("-----------------------------------------\n");
+  print_tree(nod, 0);
+  printf("-----------------------------------------\n");
+#endif
 }
 
 void __stampa_filtrate(node *nod, size_t depth, char *working_str) {
@@ -432,9 +465,7 @@ bool in_tree(node *nod, char *needle) {
   node *tmp = nod;
   size_t inline_index = 0;
   for (size_t i = 0; i < words_lenght; i++) {
-    //     printf("%s %d %d\n", tmp->str, tmp->node_lenght, tmp->str_lenght);
     if (has_inline(tmp)) {
-      //       printf("%c\n", *needle);
       if ((inline_index = get_inlined_index(tmp, *needle, words_lenght - i)) !=
           0) {
         bool same = true;
@@ -471,7 +502,7 @@ bool in_tree(node *nod, char *needle) {
 size_t count(char *str, char needle) {
   size_t cont = 0;
 
-  for (size_t i = 0; str[i] != '\0'; ++i) {
+  for (size_t i = 0; i < words_lenght; ++i) {
     if (str[i] == needle)
       cont++;
   }
@@ -481,7 +512,7 @@ size_t count(char *str, char needle) {
 
 void compute_res(char *r, char *p, char *res) {
   size_t c = 0, s = 0;
-  for (size_t i = 0; r[i] != '\0'; ++i) {
+  for (size_t i = 0; i < words_lenght; ++i) {
     size_t n = count(r, p[i]);
     if (r[i] == p[i]) {
       res[i] = '+';
@@ -490,7 +521,7 @@ void compute_res(char *r, char *p, char *res) {
     else {
       c = 0;
       s = 0;
-      for (size_t j = 0; r[j] != '\0'; ++j) {
+      for (size_t j = 0; j < words_lenght; ++j) {
         if (j < i && p[j] == p[i] && p[j] != r[j])
           s++;
         if (p[i] == r[j] && p[j] == r[j])
@@ -507,7 +538,11 @@ void compute_res(char *r, char *p, char *res) {
 
 bool compatible(char *filter, char *r, char *p) {
   bool is_same_str = true;
-  for (size_t i = 0; filter[i] != '\0'; ++i) {
+  for (size_t i = 0; i < words_lenght; ++i) {
+#ifdef DEBUG
+    printf("%c %c %c n = %d c = %d s = %d\n", filter[i], r[i], p[i],
+           no[(uint8_t)p[i]], co[(uint8_t)p[i]], sc[i]);
+#endif
     if (p[i] != r[i])
       is_same_str = false;
 
@@ -531,28 +566,6 @@ bool compatible(char *filter, char *r, char *p) {
   }
 
   return !is_same_str;
-}
-
-void print_tree(node *nod, int depth) {
-  int cont = 0;
-  if (nod->str[0] == '#')
-    cont = 0;
-  printf("%*s%s ", depth, "", nod->str);
-  if (nod->node_lenght != nod->str_lenght)
-    printf("%s ", nod->str + nod->node_lenght + 1);
-
-  if (nod->connected_nodes != 0)
-    printf("len -> %d strLen = %d connected -> %d deleted -> %hd \n",
-           nod->node_lenght, nod->str_lenght, nod->connected_nodes,
-           nod->deleted);
-  else {
-    cont++;
-    printf("len -> %d deleted -> %hd %d strlen = %d depth = %d\n",
-           nod->node_lenght, nod->deleted, cont, nod->str_lenght, depth);
-  }
-
-  for (uint32_t i = 0; i < nod->connected_nodes; i++)
-    print_tree(nod->next[i], depth + nod->node_lenght);
 }
 
 void delete_tree(node *nod) {
@@ -581,35 +594,6 @@ void delete_tree(node *nod) {
 
   for (uint32_t i = 0; i < nod->connected_nodes; i++)
     delete_tree(nod->next[i]);
-}
-
-size_t cont_tree(node *nod) {
-  if (nod->deleted == 1)
-    return 0;
-
-  size_t cont = 0;
-  if (has_inline(nod)) {
-    size_t inline_lenght = 1;
-    for (size_t i = nod->node_lenght + 2;
-         i < nod->str_lenght && *(nod->str + i) != '#' &&
-         *(nod->str + i) != '|';
-         i++)
-      inline_lenght++;
-
-    for (size_t i = nod->node_lenght + 1; i < nod->str_lenght;
-         i += inline_lenght) {
-      if (nod->str[i] == '#') {
-        cont++;
-      }
-    }
-  } else if (nod->connected_nodes == 0) {
-    return cont + 1;
-  }
-
-  for (uint32_t i = 0; i < nod->connected_nodes; i++)
-    cont += cont_tree(nod->next[i]);
-
-  return cont;
 }
 
 size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
@@ -646,7 +630,6 @@ size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
 
   if (nod->str[0] != '#') {
     // preemptive check to skip a lot of stuff
-    //     printf("-->%ld\n", depth - 1);
     bool delete_all_other_nodes = true;
     for (size_t d = depth - nod->node_lenght, l = 0; l < nod->node_lenght;
          d++, l++) {
@@ -657,6 +640,12 @@ size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
           (filter[d] == '/' &&
            (sc[d] < no[(uint8_t)str[d]] - co[(uint8_t)str[d]] ||
             (no[(uint8_t)str[d]] != 0 && nod->str[l] == str[d])))) {
+#ifdef DEBUG
+        printf("-----------------------------------------\n");
+        printf("Delete sub-tree\n");
+        print_tree(nod, 0);
+        printf("-----------------------------------------\n");
+#endif
         // set everything to deleted
         delete_tree(nod);
         return 1;
@@ -665,6 +654,12 @@ size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
     if (delete_all_other_nodes)
       // set everything else to deleted
       for (size_t l = 0; l < par->connected_nodes; l++) {
+#ifdef DEBUG
+        printf("-----------------------------------------\n");
+        printf("Delete sub-tree\n");
+        print_tree(nod, 0);
+        printf("-----------------------------------------\n");
+#endif
         if (par->next[l]->str[0] != nod->str[0])
           delete_tree(par->next[l]);
       }
@@ -732,12 +727,6 @@ size_t __remove_incompatibile(char *filter, node *nod, node *par, size_t depth,
       finished = true;
       break;
     }
-
-    //     printf("-------------------\n");
-    //     for (size_t d = depth; d < next_lenght; d++)
-    //       printf("%c", working_str[d]);
-    //     printf(" %ld\n", depth);
-    //     printf("-------------------\n");
 
     // setup counters for compatibility check
     for (size_t d = depth; d < next_lenght; d++) {
@@ -834,23 +823,27 @@ void reset_deleted_word(node *nod, char *needle) {
   return;
 }
 
+#define LONGEST_COMMAND_LENGHT 19
+
 int main() {
   char *line;
   no = calloc(UINT8_MAX, sizeof(uint16_t));
   co = calloc(UINT8_MAX, sizeof(uint16_t));
   ns = calloc(UINT8_MAX, sizeof(uint16_t));
-  sc = calloc(words_lenght, sizeof(uint16_t));
   INIT_LINE_BUFFER();
   NEW_LINE(line);
 
   words_lenght = strtol(line, NULL, 10);
+  sc = calloc(words_lenght, sizeof(uint16_t));
   node *words = init_node("#", 1);
-  line = malloc(sizeof(char) * words_lenght);
+  line = malloc(sizeof(char) * (words_lenght > LONGEST_COMMAND_LENGHT
+                                    ? words_lenght + 2
+                                    : LONGEST_COMMAND_LENGHT));
   NEW_LINE(line);
 #ifdef DEBUG
   printf("---Input check------------\n");
 #endif
-  while (!feof(stdin)) {
+  while (!is_end_of_file()) {
     if (parse_command(line) == INIZIO) {
       break;
     }
@@ -869,15 +862,13 @@ int main() {
   size_t words_count_bkp = words_count;
 #ifdef DEBUG
   printf("--------------------------\n");
-#endif
-//   print_tree(words, 0);
-#ifdef DEBUG
   printf("---Initial words----------\n");
   stampa_filtrate(words);
   printf("--------------------------\n");
 #endif
-  char *reference_word = malloc(sizeof(char) * words_lenght);
-  NEW_LINE(reference_word);
+  char *reference_word = malloc(sizeof(char) * words_lenght + 1);
+  NEW_LINE(line);
+  reference_word = memcpy(reference_word, line, sizeof(char) * words_lenght);
 #ifdef DEBUG
   printf("---Reference word---------\n");
   printf("%s\n", reference_word);
@@ -893,7 +884,7 @@ int main() {
 
   bool has_won = false;
   bool finished = false;
-  char *res = malloc(sizeof(char) * words_lenght);
+  char *res = malloc(sizeof(char) * words_lenght + 1);
   szArr *saved_results = malloc(sizeof(szArr));
   szArr *saved_guesses = malloc(sizeof(szArr));
 
@@ -907,7 +898,7 @@ int main() {
   }
 
   NEW_LINE(line);
-  while (!feof(stdin)) {
+  while (!is_end_of_file()) {
     for (size_t i = 0; num_of_guesses > 0; ++i) {
 #ifdef DEBUG
       printf("---Input------------------\n");
@@ -941,22 +932,19 @@ int main() {
         stampa_filtrate(words);
         printf("---Fine--------------------\n");
 #endif
-        //                 printf("%ld\n", words_count);
-
         for (size_t j = 0; j < saved_results->len; j++) {
-          //           printf("--->%ld", words_count);
           remove_incompatibile(saved_results->v[j], words, saved_guesses->v[j]);
-          //           printf(" %s %s ", saved_results->v[j],
-          //           saved_guesses->v[j]); printf("%ld\n", words_count);
         }
 
         NEW_LINE(line);
         continue;
 
-      } else if (strcmp(reference_word, line) == 0) {
+      } else if (memcmp(reference_word, line, sizeof(char) * words_lenght) ==
+                 0) {
         has_won = true;
-        if (!feof(stdin)) {
-          NEW_LINE(line);
+        input_string_lenght = getline(&line, &len, stdin);
+        if (!is_end_of_file()) {
+          line[input_string_lenght - 1] = '\0';
         }
         num_of_guesses = 0;
         break;
@@ -969,23 +957,23 @@ int main() {
 #ifdef DEBUG
         printf("---------------------------\n");
 #endif
-        NEW_LINE(line);
+        input_string_lenght = getline(&line, &len, stdin);
+        if (!is_end_of_file()) {
+          line[input_string_lenght - 1] = '\0';
+        }
         continue;
       }
       compute_res(reference_word, line, res);
       res[words_lenght] = '\0';
       saved_results->len++;
-      strcpy(saved_results->v[saved_results->len - 1], res);
+      memcpy(saved_results->v[saved_results->len - 1], res,
+             sizeof(char) * words_lenght);
       saved_guesses->len++;
-      strcpy(saved_guesses->v[saved_guesses->len - 1], line);
-
-      //       printf("----------------------------------\n");
-      //       print_tree(words, 0);
+      memcpy(saved_guesses->v[saved_guesses->len - 1], line,
+             sizeof(char) * words_lenght);
 
       remove_incompatibile(res, words, line);
 
-#ifdef DEBUG
-#endif
       printf("%s\n%ld\n", res, words_count);
       num_of_guesses--;
       NEW_LINE(line);
@@ -995,7 +983,11 @@ int main() {
       has_won = false;
       finished = true;
     }
-    //     print_tree(words, 0);
+
+#ifdef DEBUG
+    printf("-----------------------------------------\n");
+    print_tree(words, 0);
+#endif
     if (parse_command(line) == INS_INI) {
 #ifdef DEBUG
       printf("---Input------------------\n");
@@ -1031,7 +1023,8 @@ int main() {
       stampa_filtrate(words);
       printf("--------------------------\n");
 #endif
-      NEW_LINE(reference_word);
+      NEW_LINE(line);
+      memcpy(reference_word, line, sizeof(char) * words_lenght);
 #ifdef DEBUG
       printf("---Reference word---------\n");
       printf("%s\n", reference_word);
@@ -1059,9 +1052,13 @@ int main() {
       finished = false;
       words_count = words_count_bkp;
     }
-    NEW_LINE(line);
+    if (!is_end_of_file()) {
+      NEW_LINE(line);
+    }
   }
-  //   print_tree(words, 0);
-  // TODO Free everything
+#ifdef DEBUG
+  printf("-----------------------------------------\n");
+  print_tree(words, 0);
+#endif
   return 0;
 }
