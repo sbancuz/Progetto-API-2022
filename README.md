@@ -8,6 +8,11 @@ Fa un print in console dell'output
 chmod +x ./run
 ./run soluzione <inserisci_test>
 ```
+Se si vogliono informazioni di debug, sconsigliato su test grandi
+```bash
+chmod +x ./run
+./run soluzione <inserisci_test> d
+```
 # Test
 Controlla output con i file di test
 
